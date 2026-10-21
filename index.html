@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jコイン統合試作（サーバー版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+/* Layout: 上の切替で3画面。お客様・コンパニオンはスマホ幅1カラム、管理画面は左メニュー＋本文 */
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --surface-2:#F5F6F8; --line:#E3E6EB; --fg:#1B2230; --muted:#5F6670;
+  --navy:#1F3A5F; --navy-deep:#142844; --primary:#1F3A5F; --on-primary:#FFFFFF;
+  --orange:#E07A2E; --on-orange:#1B2230; --orange-ink:#A84A12; --orange-soft:#FDEBDC;
+  --gold:#C99A2E; --gold-ink:#8A6A1F; --gold-soft:#FBF1DC;
+  --wine:#7A2E55; --wine-soft:#F3E6EC;
+  --ok:#3F6E4A; --ok-soft:#E6F1E8; --danger:#B3261E; --danger-soft:#FBE9E7;
+  --font-display:'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic',sans-serif;
+  --font-body:'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1420; --surface:#172131; --surface-2:#1C2839; --line:#2A3850; --fg:#E8ECF2; --muted:#A3ADBC;
+  --primary:#3D6496; --orange-ink:#F2A56B; --orange-soft:#3A2616; --gold-ink:#E2BE62; --gold-soft:#33290F;
+  --wine:#D88AAE; --wine-soft:#3A2432;
+  --ok:#8FC79B; --ok-soft:#1D2E22; --danger:#F2958F; --danger-soft:#3A1A18; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1420; --surface:#172131; --surface-2:#1C2839; --line:#2A3850; --fg:#E8ECF2; --muted:#A3ADBC;
+  --primary:#3D6496; --orange-ink:#F2A56B; --orange-soft:#3A2616; --gold-ink:#E2BE62; --gold-soft:#33290F;
+  --wine:#D88AAE; --wine-soft:#3A2432;
+  --ok:#8FC79B; --ok-soft:#1D2E22; --danger:#F2958F; --danger-soft:#3A1A18; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.6;padding-inline:16px;padding-block:0 32px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.num{font-variant-numeric:tabular-nums}
+.demobar{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding-block:14px}
+.demobar .title{font-family:var(--font-display);font-weight:900;font-size:16px}
+.demobar .title small{font-family:var(--font-body);font-weight:500;font-size:12px;color:var(--muted);margin-left:8px}
+.seg{display:inline-flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:8px 14px;font-weight:700;color:var(--muted);min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--on-primary)}
+.linkbtn{border:0;background:transparent;color:var(--muted);text-decoration:underline;font-size:12px;min-height:36px;padding:0 8px}
+.btn{border:0;border-radius:999px;min-height:44px;padding:0 18px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+.btn-primary{background:var(--primary);color:var(--on-primary)}
+.btn-orange{background:var(--orange);color:var(--on-orange)}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--fg)}
+.btn-danger{background:var(--danger-soft);color:var(--danger)}
+.btn-sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label,.flabel{font-size:12px;font-weight:700;color:var(--muted)}
+.input{width:100%;min-height:44px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px}
+textarea.input{min-height:84px;resize:vertical}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.chip{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;white-space:nowrap}
+.chip-new{background:var(--orange-soft);color:var(--orange-ink)}
+.chip-ok{background:var(--ok-soft);color:var(--ok)}
+.chip-wait{background:var(--gold-soft);color:var(--gold-ink)}
+.chip-ng{background:var(--danger-soft);color:var(--danger)}
+.chip-official{background:var(--navy);color:#fff}
+.muted{color:var(--muted)} .small{font-size:12px} .coin{color:var(--gold-ink);font-weight:700}
+.empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+.err{color:var(--danger);font-size:12px;font-weight:500;margin:0;min-height:1em}
+.note{font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:8px 12px;margin:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* スマホ画面 */
+.phone{max-width:420px;margin:0 auto;background:var(--surface-2);border:1px solid var(--line);border-radius:24px;overflow:hidden;display:flex;flex-direction:column;min-height:760px}
+.phone.comp{--primary:var(--wine)}
+.c-head{background:var(--navy);color:#fff;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex:none}
+.phone.comp .c-head{background:var(--wine)}
+.c-head .logo{font-family:var(--font-display);font-weight:900;font-size:17px;letter-spacing:1px}
+.balance{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 6px;border-radius:18px;background:#FBF1DC;color:#1B2230;border:0;font-weight:700}
+.jmark{width:24px;height:24px;border-radius:50%;background:var(--gold);color:#FFF8E6;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex:none}
+.c-body{flex:1;padding:16px 14px 20px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.c-nav{flex:none;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:var(--surface);border-top:1px solid var(--line)}
+.c-nav button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:62px;font-size:11px;color:var(--muted);font-weight:500;position:relative}
+.c-nav button[aria-current="page"]{color:var(--primary);font-weight:700}
+.c-nav svg{width:22px;height:22px}
+.dot{position:absolute;top:6px;right:calc(50% - 20px);min-width:18px;height:18px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-h h2{font-size:17px;font-weight:900}
+.pg-h{font-size:21px;font-weight:900}
+.list{display:flex;flex-direction:column}
+.list > *{border-bottom:1px solid var(--line)} .list > *:last-child{border-bottom:0}
+.row-btn{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:0;background:transparent;padding:10px 14px;min-height:48px}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 14px;font-size:14px}
+.hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.st-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.st-tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:56px;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+.st-tile b{font-size:13px;line-height:1.3;word-break:keep-all}.st-tile span{font-size:11px;color:var(--muted)}
+.st-tile:hover{border-color:var(--primary)}
+.seg-sm button{min-height:32px;padding:0 12px;font-size:12px}
+.findbar{display:flex;gap:6px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 10px}
+.findbar .fi{display:flex;color:var(--muted)}
+.findbar .input{flex:1;min-width:0;border:none;background:transparent;padding:0 4px;height:40px}
+.banner{flex:none;width:280px;max-width:85%;height:124px;border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;border:0;text-align:left}
+.banner .lab{font-size:11px;font-weight:700;letter-spacing:2px} .banner .tt{font-family:var(--font-display);font-size:19px;font-weight:900;line-height:1.3}
+.b-orange{background:#C4561C;color:#fff}.b-orange .lab{color:#FFE3CF}
+.b-navy{background:var(--navy);color:#fff}.b-navy .lab{color:#E9D39C}
+.ph{background:var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:8px;flex:none}
+.newbie{flex:none;width:120px;scroll-snap-align:start;display:flex;flex-direction:column;gap:3px;border:0;background:transparent;text-align:left;padding:0}
+.ev-grid,.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.yt{height:170px;border-radius:12px;background:var(--navy-deep);color:#E3E6EB;display:flex;align-items:center;justify-content:center;position:relative;text-decoration:none}
+.yt .play{width:60px;height:42px;border-radius:12px;background:var(--orange);display:flex;align-items:center;justify-content:center}
+.yt .cap{position:absolute;left:12px;bottom:10px;font-size:12px}
+.pills{display:flex;gap:8px;overflow-x:auto}
+.pill{flex:none;min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500}
+.pill[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.post{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.post.official{border-left:4px solid var(--navy)}
+.chat{display:flex;flex-direction:column;gap:10px;min-height:240px}
+.bw{display:flex;flex-direction:column;gap:2px;max-width:78%}
+.bubble{padding:9px 13px;border-radius:16px;font-size:14px;line-height:1.6;word-break:break-word;white-space:pre-wrap}
+.me{align-self:flex-end;align-items:flex-end}.me .bubble{background:var(--primary);color:var(--on-primary);border-top-right-radius:4px}
+.them{align-self:flex-start}.them .bubble{background:var(--surface);border:1px solid var(--line);border-top-left-radius:4px}
+.sys{align-self:stretch;max-width:100%}.sys .bubble{background:var(--danger-soft);color:var(--danger);font-size:12px}
+.composer{display:flex;gap:8px;align-items:center}
+.composer .input{border-radius:22px}
+.lockbtn{min-height:40px;border-radius:20px;border:1.5px solid var(--orange);background:var(--orange-soft);color:var(--orange-ink);font-weight:700;font-size:13px}
+.skel{height:10px;border-radius:5px;background:var(--surface-2);display:block}
+.bal-card{background:var(--navy-deep);color:#fff;border-radius:16px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.bal-card .v{font-family:var(--font-display);font-size:32px;font-weight:900;line-height:1.1}
+.use{padding:12px;display:flex;flex-direction:column;gap:4px}
+.use .foot{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:auto}
+.stars{color:#B07E12;letter-spacing:1px}.stars .off{color:var(--line)}
+.login{padding:28px 20px;display:flex;flex-direction:column;gap:14px}
+.login h1{font-size:23px;font-weight:900}
+.hint{background:var(--gold-soft);color:var(--gold-ink);border-radius:8px;padding:8px 12px;font-size:12px;margin:0}
+.thumb{width:100%;max-height:220px;object-fit:cover;border-radius:10px}
+.sheet-back{position:fixed;inset:0;background:rgba(10,16,28,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px}
+.sheet{width:100%;max-width:440px;max-height:85%;overflow:auto;background:var(--surface);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;font-size:13px;z-index:30;max-width:calc(100% - 32px)}
+
+/* 管理画面 */
+.admin{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.a-side{flex:1 1 210px;max-width:100%;display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px}
+.a-side .who{padding:4px 6px 10px;border-bottom:1px solid var(--line);margin-bottom:4px;display:flex;flex-direction:column;gap:6px}
+.a-side .grp{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;padding:10px 10px 2px}
+.a-side button.nav{border:0;background:transparent;text-align:left;padding:8px 12px;border-radius:8px;min-height:40px;font-weight:500;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.a-side button.nav[aria-current="page"]{background:var(--navy);color:#fff;font-weight:700}
+.badge{min-width:22px;height:22px;border-radius:11px;background:var(--orange);color:var(--on-orange);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.a-main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.a-main h1{font-size:22px;font-weight:900}
+.panel{padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel h2{font-size:16px;font-weight:900}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{padding:14px;display:flex;flex-direction:column;gap:2px}
+.stat .v{font-family:var(--font-display);font-size:26px;font-weight:900;line-height:1.2}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
+td.act{white-space:nowrap;text-align:right}
+.hb{display:flex;flex-direction:column;gap:8px}
+.hb-row{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr) 4em;gap:10px;align-items:center;font-size:13px}
+.hb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-track{height:14px;display:block}
+.hb-bar{display:block;height:100%;background:var(--primary);border-radius:0 4px 4px 0}
+.hb-row:hover .hb-bar{background:var(--orange)}
+.hb-v{text-align:right;color:var(--muted)}
+.vb{display:flex;align-items:flex-end;gap:2px;height:170px;padding-top:18px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.vb-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+.vb-bar{width:70%;max-width:28px;background:var(--primary);border-radius:4px 4px 0 0;display:block}
+.vb-col:hover .vb-bar{background:var(--orange)}
+.vb-v{font-size:11px;color:var(--muted);min-height:16px}
+.vb-x{position:absolute;bottom:-20px;font-size:11px;color:var(--muted);white-space:nowrap}
+.btn svg{width:18px;height:18px}
+.sgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sbtn{min-height:46px;border:1px solid var(--muted);background:var(--surface);border-radius:4px;font-size:15px;padding:0 8px}
+.sbtn.full{grid-column:1 / -1}
+.sbtn[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:700}
+.guide{max-width:1100px;margin:0 auto 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0 16px}
+.guide summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--fg)}
+.guide-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px 20px;padding:4px 0 16px;font-size:13px;line-height:1.65}
+.guide-body ol{margin:4px 0 0;padding-left:1.3em}
+@media (max-width:600px){.guide{margin-inline:16px}}
+.aview{max-width:1100px;margin:0 auto 10px;display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.admin.sp{max-width:430px;flex-direction:column;flex-wrap:nowrap;gap:12px;align-items:stretch}
+.admin.sp.framed{border:1px solid var(--line);border-radius:28px;padding:14px;background:var(--bg);box-shadow:0 8px 30px rgba(20,40,68,.12)}
+.sp-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border-radius:14px;padding:8px 8px 8px 14px}
+.sp-bar .ttl{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.sp-bar .ttl b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp-bar .ttl span{font-size:11px;opacity:.8}
+.sp-bar .mbtn{border:0;background:#fff;color:var(--navy);border-radius:10px;min-height:40px;padding:0 12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.admin.sp .a-side{flex:none;width:100%}
+.admin.sp .a-main{flex:none;width:100%}
+.admin.sp .a-main h1{font-size:19px}
+.admin.sp .form-grid,.admin.sp .split{grid-template-columns:1fr}
+.admin.sp .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.admin.sp table,.admin.sp tbody{display:block}.admin.sp thead{display:none}
+.admin.sp tr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--line)}
+.admin.sp td{display:block;position:relative;padding:2px 0;border:0;text-align:left;overflow-wrap:anywhere}
+.admin.sp td[data-label]{padding-left:7.5em}
+.admin.sp td[data-label]::before{content:attr(data-label);position:absolute;left:0;top:3px;width:7em;color:var(--muted);font-size:12px}
+.admin.sp td.act{padding-left:0;padding-top:6px}.admin.sp td.act::before{display:none}
+.howto{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:2px 12px}
+.howto-b{border:0;background:transparent;width:100%;min-height:40px;display:flex;align-items:center;gap:8px;font:inherit;font-size:13px;font-weight:700;color:var(--fg);cursor:pointer;padding:0}
+.howto-b .q{width:20px;height:20px;border-radius:10px;background:var(--navy);color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.howto-b .ar{margin-left:auto;font-size:10px;color:var(--muted)}
+.howto ul{margin:0 0 10px;padding-left:1.3em;font-size:13px;line-height:1.7;color:var(--fg)}
+.news-scroll{max-height:252px;overflow-y:auto;overscroll-behavior:contain}
+.nb-more{justify-content:center;align-items:center}
+.nb-more-in{width:120px;height:160px;border-radius:10px;border:1px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;font-weight:700;color:var(--primary)}
+.nb-more-in b{font-size:18px}
+.nb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.nb-tile{border:0;background:transparent;padding:0;text-align:left;display:flex;flex-direction:column;gap:2px;font:inherit;color:var(--fg);cursor:pointer;min-width:0}
+.nb-tile img,.nb-tile .ph{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;max-width:100%}
+.nb-tile b{font-size:13px}.nb-tile span:not(.ph){font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+
+/* ===== ガチャ ===== */
+.gc-hero{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--line);background:linear-gradient(135deg,var(--gold-soft),var(--surface) 70%);color:var(--fg);text-align:left;border-radius:14px;width:100%;cursor:pointer;font:inherit}
+.gc-hero .t{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.gc-hero b{font-family:var(--font-display);font-size:17px}
+.gc-mini{width:46px;height:56px;flex:none}
+.gc-stage{display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px 12px}
+.gc-machine{width:190px;max-width:68%;height:auto;overflow:visible}
+.gc-machine .knob,.gc-machine .balls,.gc-machine .cap{transform-box:fill-box;transform-origin:center}
+.gc-machine .cap{opacity:0}
+.gc-stage.spin .knob{animation:gcTurn .9s ease-in-out}
+.gc-stage.spin .balls{animation:gcShake .3s ease-in-out 3}
+.gc-stage.spin .cap{animation:gcDrop .6s .85s ease-in forwards}
+@keyframes gcTurn{to{transform:rotate(360deg)}}
+@keyframes gcShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes gcDrop{0%{opacity:1;transform:translateY(-24px)}70%{opacity:1;transform:translateY(5px)}100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.gc-stage.spin .knob,.gc-stage.spin .balls,.gc-stage.spin .cap{animation:none}.gc-stage.spin .cap{opacity:1}}
+.gc-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.gc-btns .btn{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:58px;line-height:1.3;gap:0}
+.gc-btns .btn:disabled{opacity:.45;cursor:not-allowed}
+.rk{display:inline-flex;min-width:26px;height:22px;padding:0 7px;border-radius:6px;font-weight:700;font-size:12px;align-items:center;justify-content:center;white-space:nowrap}
+.rk-S{background:var(--wine-soft);color:var(--wine)}.rk-A{background:var(--orange-soft);color:var(--orange-ink)}.rk-B{background:var(--gold-soft);color:var(--gold-ink)}.rk-C{background:var(--surface-2);color:var(--muted)}
+.gc-rates td,.gc-rates th{padding:7px 6px;border-bottom:1px solid var(--line);font-size:13px;text-align:left}
+.gc-rates td:last-child,.gc-rates th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.gc-rates{width:100%;border-collapse:collapse}
+.gc-result{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:6px 0}
+.gc-result .big{font-family:var(--font-display);font-size:22px;font-weight:900;line-height:1.35}
+.gc-result .ball{width:64px;height:64px;border-radius:50%;border:3px solid var(--line)}
+.gc-tbl input{min-width:76px}.gc-tbl select[name^="rank"]{min-width:128px}.gc-tbl select[name^="kind"]{min-width:150px}.gc-tbl .btn{white-space:nowrap}
+.gc-tbl input[name^="name"]{min-width:170px}
+
+/* ===== v20 追加 ===== */
+.phone{overflow:clip}
+.c-nav{position:sticky;bottom:0;z-index:10;padding-bottom:env(safe-area-inset-bottom,0px)}
+.chip-match{background:var(--orange-soft);color:var(--orange-ink)}
+.ob{display:flex;flex-direction:column;gap:18px}
+.ob fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ob legend{font-weight:700;font-size:14px;padding:0;margin-bottom:8px}
+.ob legend .small{font-weight:400}
+.ckgrid{display:flex;flex-wrap:wrap;gap:6px}
+.ck{position:relative;display:inline-flex}
+.ck input{position:absolute;opacity:0;width:1px;height:1px}
+.ck span{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:13px;cursor:pointer;user-select:none}
+.ck input:checked+span{border-color:var(--navy);background:var(--navy);color:#fff;font-weight:700}
+.ck input:focus-visible+span{outline:3px solid var(--orange);outline-offset:2px}
+.ob .grp-l{font-size:12px;color:var(--muted);width:100%}
+.rv-head{display:flex;align-items:center;gap:8px}
+.rv-score{font-family:var(--font-display);font-weight:900;font-size:18px;font-variant-numeric:tabular-nums}
+.rv-items{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 10px;align-items:center;font-size:12.5px}
+.rv-bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.rv-bar i{display:block;height:100%;background:#B07E12}
+.rv-items.locked{filter:blur(3px);opacity:.6;pointer-events:none;user-select:none}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.starpick{display:flex;flex-direction:row-reverse;gap:0}
+.starpick input{position:absolute;opacity:0;width:1px;height:1px}
+.starpick label{font-size:26px;line-height:1;color:var(--line);cursor:pointer;padding:2px}
+.starpick input:checked~label,.starpick label:hover,.starpick label:hover~label{color:#B07E12}
+.starpick input:focus-visible+label{outline:2px solid var(--orange);border-radius:4px}
+.jk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:360px){.jk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.jk-tile{position:relative;border:0;border-radius:12px;padding:10px;min-height:92px;text-align:left;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;font:inherit;cursor:pointer;overflow:hidden}
+.jk-tile b{font-size:13px;line-height:1.3;position:relative}
+.jk-tile span{font-size:11px;opacity:.85;position:relative}
+.jk-tile .new{position:absolute;top:8px;left:8px;background:#E07A2E;color:#1B2230;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;opacity:1}
+.jk-tile .pl{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
+.jk0{background:linear-gradient(160deg,#2A4A75,#142844)}.jk1{background:linear-gradient(160deg,#7A2E55,#3A1528)}.jk2{background:linear-gradient(160deg,#8A5A1F,#3D2708)}.jk3{background:linear-gradient(160deg,#A84A12,#4A1F05)}.jk4{background:linear-gradient(160deg,#4A3A6E,#211833)}.jk5{background:linear-gradient(160deg,#2F6B5A,#10302A)}
+.jv{position:fixed;inset:0;z-index:15;background:#000;display:flex;justify-content:center}
+.jv-in{position:relative;width:100%;max-width:440px;height:100%}
+.jv-feed{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none}
+.jv-feed::-webkit-scrollbar{display:none}
+.jv-slide{height:100%;scroll-snap-align:start;scroll-snap-stop:always;position:relative;display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden}
+.jv-slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.jv-slide audio{position:absolute;bottom:96px;left:12px;right:12px;width:calc(100% - 24px)}
+.jv-ph{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:0 30px}
+.jv-ph .ic{width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center}
+.jv-top{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 16px;z-index:2;background:linear-gradient(rgba(0,0,0,.6),transparent);color:#fff}
+.jv-x{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.2);color:#fff;font-size:22px;line-height:1;cursor:pointer}
+.jv-bal{display:inline-flex;gap:6px;align-items:center;background:rgba(0,0,0,.5);border-radius:999px;padding:4px 12px 4px 4px;font-weight:700}
+.jv-who{position:absolute;left:12px;right:64px;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);display:flex;flex-direction:column;gap:6px;z-index:2;align-items:flex-start}
+.jv-name{display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:4px 14px 4px 4px;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.jv-prof{background:none;border:0;color:#fff;text-decoration:underline;font:inherit;font-size:13px;padding:4px 2px;cursor:pointer}
+.jv-hint{position:absolute;right:8px;bottom:32%;z-index:2;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:rgba(255,255,255,.85);text-align:center;line-height:1.3}
+.jv-earn{position:absolute;top:76px;left:50%;transform:translateX(-50%);background:#C99A2E;color:#1B2230;font-weight:900;padding:6px 16px;border-radius:999px;z-index:3;white-space:nowrap;animation:jvUp 1.8s ease forwards}
+@keyframes jvUp{0%{opacity:0;transform:translate(-50%,10px)}15%{opacity:1;transform:translate(-50%,0)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px)}}
+.jv-prog{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.2);z-index:2}
+.jv-prog i{display:block;height:100%;width:0;background:#C99A2E}
+.jv-empty{color:#fff;display:flex;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center}
+@media (prefers-reduced-motion:reduce){.jv-earn{animation:none}}
+.tm{display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 14px}
+.tm-ring{width:230px;max-width:78%;aspect-ratio:1;position:relative}
+.tm-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.tm-ring .bg{fill:none;stroke:var(--line);stroke-width:12}
+.tm-ring .fg{fill:none;stroke:var(--wine);stroke-width:12;stroke-linecap:round}
+.tm-ring.warn .fg{stroke:var(--orange)}
+.tm-ring.over .fg{stroke:var(--danger)}
+.tm-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center}
+.tm-left{font-family:var(--font-display);font-weight:900;font-size:46px;font-variant-numeric:tabular-nums;line-height:1}
+.tm-ring.over .tm-left{color:var(--danger)}
+.tm-msg{width:100%;padding:12px 14px;border-radius:12px;background:var(--orange-soft);color:var(--orange-ink);font-weight:700;text-align:center}
+.tm-msg.over{background:var(--danger-soft);color:var(--danger)}
+.tm-btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+.tm-btns .btn{min-height:52px}
+.pillrow{display:flex;flex-wrap:wrap;gap:6px}
+.col-list{max-height:260px;overflow:auto}
+
+.banner.has-img{padding:0;position:relative;overflow:hidden;background:var(--navy-deep)}
+.banner.has-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.bn-thumb{width:112px;height:50px;border-radius:8px;object-fit:cover;display:block;background:var(--surface-2)}
+.bn-prev{width:280px;max-width:100%;aspect-ratio:840/372;border-radius:12px;overflow:hidden;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+.bn-prev img{width:100%;height:100%;object-fit:cover;display:block}
+
+.js-hero{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border:0;border-radius:14px;background:linear-gradient(120deg,#142844,#3A1528);color:#fff;text-align:left;font:inherit;cursor:pointer}
+.js-hero .t{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.js-hero b{font-family:var(--font-display);font-size:18px;letter-spacing:.5px}
+.js-hero .small{color:#E5E8EE}.js-hero .small b{font-size:12px;color:#E9D39C}
+.js-ic{width:44px;height:44px;border-radius:12px;background:#E07A2E;display:flex;align-items:center;justify-content:center;flex:none}
+.js-new{display:inline-block;vertical-align:3px;background:#E07A2E;color:#1B2230;font-family:var(--font-body);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:0}
+.js-go{flex:none;font-size:12px;font-weight:700;background:rgba(255,255,255,.15);padding:6px 12px;border-radius:999px}
+</style>
+
+<div class="demobar">
+  <div class="title">Jコイン統合試作<small>サーバー版：同じURLを開いた全員でデータを共有します（仮データのみ）</small></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div class="seg" role="group" aria-label="表示する画面">
+      <button type="button" id="mode-c" data-act="mode" data-v="c">お客様</button>
+      <button type="button" id="mode-g" data-act="mode" data-v="g">コンパニオン</button>
+      <button type="button" id="mode-a" data-act="mode" data-v="a">管理画面</button>
+    </div>
+    <button type="button" class="linkbtn" data-act="reset">全員のデータを最初に戻す</button>
+  </div>
+</div>
+<details class="guide">
+  <summary>デモの流れ（ミーティング用）を開く</summary>
+  <div class="guide-body">
+    <div><b>① お客様の登録とJコイン</b><ol><li>「お客様」→ 電話番号に新しい番号を入力 → 認証コード 123456</li><li>年齢・よく使う店舗・好みを選ぶ → 好みに合う女性と自動でJ chatがつながる</li><li>登録ボーナス＋100J、ログイン＋30Jが付くことを確認</li><li>熟フェチ図鑑（縦動画）を見る（＋10J）、口コミの詳しい点数を10Jで見る、ガチャを回す</li></ol></div>
+    <div><b>② 女性を探して J chat</b><ol><li>「女性を探す」で店舗・並び替え・絞り込み</li><li>お気に入り申請 → コンパニオン画面で女性が「相互お気に入りにする」（店舗が管理画面で相互にすることも可）</li><li>ホーム下の「店舗一覧」「女性検索」からも探せる</li><li>トークを送る（1通1J・1日10通まで・女性の返信が来るまで次は送れない）</li></ol></div>
+    <div><b>③ コンパニオン側</b><ol><li>「コンパニオン」→ 担当者コード 9001／パスワード 9001</li><li>ホーム一番上のお知らせ・写メ日記の投稿</li><li>メッセージ（J chat）で返信・ブロック。「お休みにする」で受付を止められる</li><li>タイマー（コースの残り時間）、お知らせの下のコラム</li></ol></div>
+    <div><b>④ 管理画面</b><ol><li>アクセス分析・ホーム画面追加率</li><li>名簿のExcel取り込み（担当者コードと源氏名のみ）</li><li>名簿の「プロフィール」で女性の写真を登録 → お客様の一覧に反映</li><li>J chatの見守り（自動マッチングの設定・相互お気に入り）、会員の利用制限</li><li>熟フェチ図鑑の投稿・設定、ガチャの景品と確率、女性向けコラム</li></ol></div>
+    <p class="muted small" style="margin:0;grid-column:1/-1">※ すべて仮データです。データはサーバーに保存され、同じURLを開いた全員で共有されます。「全員のデータを最初に戻す」で初期状態に戻ります。本物のお客様の電話番号や女性の名前は入れないでください。</p>
+  </div>
+</details>
+<div id="app"></div>
+<div id="sheet-root"></div>
+<div id="toast-root" aria-live="polite"></div>
+<div id="recaptcha-box"></div>
+
+<script>
+/* ===== ルール（たたき台） ===== */
+const R={FIRST:100,LOGIN:30,VIEW:10,VIEW_CAP:10,REVIEW:100,MSG:1,MSG_DAY:10,READ:10,RESERVE:100,APOLLO:300};
+/* コンパニオンページの機能スイッチ（false＝非表示。拡張時に true に戻す） */
+const GFEAT={shift:false,memo:false,points:false};
+/* お客様ページの機能スイッチ（掲示板は廃止） */
+const CFEAT={board:false};
+const STORES=['熟女家 梅田店','熟女家 十三店','熟女家 京橋店','熟女家 堺東店','熟女家 豊中蛍池店','熟女家 東大阪店','熟女家 ミナミ・エリア店','PLUS 梅田店','PLUS 十三店','PLUS 難波店','PLUS 東大阪店'];
+const PORTALS=['ポータルA','ポータルB'];
+const KEY='jcoin-integrated-v5';
+const day=86400000, now0=Date.now();
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
+const dkey=t=>{const d=new Date(t);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
+const md=t=>{const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate()};
+const hm=t=>{const d=new Date(t);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const yen=n=>Number(n).toLocaleString('ja-JP');
+const mask=p=>p.slice(0,3)+'-****-'+p.slice(-4);
+const tel=p=>p.length===11?p.slice(0,3)+'-'+p.slice(3,7)+'-'+p.slice(7):p;
+
+
+/* ===== v20：初期データの追加分（すべて架空） ===== */
+const JG=[['leg','パンスト・脚'],['wear','着衣・下着'],['voice','イキ声・性感帯ボイス'],['hand','手コキ・フェラ'],['bust','胸の谷間・おっぱい公開'],['hip','お尻']];
+function MORE_GIRLS(){
+  const B=['スレンダー','普通','ぽっちゃり','グラマー'],F=['パンスト・脚','着衣・下着','イキ声・性感帯ボイス','手コキ・フェラ','胸の谷間・おっぱい公開'];
+  return [['ゆり',2,46,156,'E'],['なつみ',1,39,162,'C'],['れいこ',9,52,158,'D'],['かおり',3,44,155,'G'],['しのぶ',4,48,160,'B'],['ともこ',5,41,153,'F'],['ひとみ',6,37,164,'D'],['まどか',7,33,158,'E'],['ゆかり',8,55,157,'C'],['えみ',10,45,151,'H'],['みき',0,50,163,'D'],['はるか',8,36,159,'F']]
+   .map(([nm,si,age,h,cup],i)=>({code:String(9005+i),name:'[例]'+nm,kana:nm,age,height:h,cup,hotel:i%3!==1,home:i%2===0,nosmoke:i%4!==2,store:STORES[si],active:true,talkOn:true,body:B[i%4],fet:[F[i%5],F[(i+2)%5]]}));
+}
+function JUKU_SEED(){
+  const codes=['9001','9002','9003','9005','9006','9007','9008','9010','9012','9013'];const a=[];
+  JG.forEach((g,gi)=>{for(let k=0;k<4;k++)a.push({id:'jk'+gi+k,g:g[0],code:codes[(gi*3+k)%codes.length],kind:gi===2?'voice':'video',t:now0-(k*2+gi)*day-k*3600000,status:'on'})});
+  return a;
+}
+/* ===== 初期データ（すべて架空） ===== */
+function seed(){
+  const reg={};[3,5,2,4,6,8,5,7,9,6,11,8,10,12].forEach((n,i)=>reg[dkey(now0-(13-i)*day)]=n);
+  return {
+    ui:{mode:'c',tab:'home',chatWith:null,rvFilter:'all',bdFilter:'all',aTab:'dash',store:STORES[0],loginStep:'phone',pendingPhone:'',
+        gTab:'home',gThread:null,memoEdit:null,ym:null,endType:'UP',aRoom:null,imp:null,sort:'',flt:{}},
+    cur:null, gcur:null,
+    users:{
+      '09000000001':{phone:'09000000001',nick:'[例]常連A',coins:420,lastLogin:'',views:{d:'',n:0},unlocked:[],items:[],banned:false,limited:false,attr:{self:'50代',stores:['熟女家 梅田店','PLUS 十三店'],body:['普通','グラマー'],age:['35〜44歳','45〜54歳'],cup:['D〜E','F以上'],fet:['パンスト・脚','着衣・下着']},installed:true,history:[{t:now0-3*day,v:50,r:'初回登録ボーナス'},{t:now0-2*day,v:370,r:'ご利用（PLUS 十三店）'}]},
+      '09000000002':{phone:'09000000002',nick:'[例]Bさん',coins:80,lastLogin:'',views:{d:'',n:0},unlocked:[],items:[],banned:false,limited:false,attr:{self:'60代',stores:['PLUS 十三店'],body:['スレンダー'],age:['35〜44歳'],cup:[],fet:['イキ声・性感帯ボイス']},installed:false,history:[{t:now0-5*day,v:50,r:'初回登録ボーナス'},{t:now0-day,v:30,r:'口コミ投稿'}]}
+    },
+    comps:[
+      {code:'9001',jp:120,jh:[{t:now0-day,v:100,r:'店舗からの特別付与（新人応援）'},{t:now0-day,v:20,r:'写メ日記を投稿'}],name:'[例]さくら',kana:'さくら',age:42,height:158,cup:'D',hotel:true,home:true,nosmoke:true,store:'熟女家 梅田店',active:true,talkOn:true,body:'普通',fet:['パンスト・脚','着衣・下着']},
+      {code:'9002',name:'[例]みどり',kana:'みどり',age:35,height:165,cup:'C',hotel:true,home:false,nosmoke:false,store:'PLUS 十三店',active:true,talkOn:true,body:'スレンダー',fet:['パンスト・脚','イキ声・性感帯ボイス']},
+      {code:'9003',name:'[例]まい',kana:'まい',age:29,height:152,cup:'F',hotel:true,home:true,nosmoke:true,store:'PLUS 東大阪店',active:true,talkOn:true,body:'グラマー',fet:['胸の谷間・おっぱい公開','着衣・下着']},
+      {code:'9004',name:'[例]あやか',kana:'あやか',age:38,height:160,cup:'E',hotel:false,home:true,nosmoke:false,store:'PLUS 梅田店',active:true,talkOn:false,body:'ぽっちゃり',fet:['手コキ・フェラ']}
+    ].concat(MORE_GIRLS()),
+    rooms:[
+      {id:'09000000001|9001',phone:'09000000001',code:'9001',status:'open',by:'staff',t:now0-day,flags:[],msgs:[{from:'u',text:'[例] 先日はありがとうございました！',t:now0-day},{from:'g',text:'[例] こちらこそ！またお会いできるのを楽しみにしています。',t:now0-day+3600000}]},
+      {id:'09000000002|9002',phone:'09000000002',code:'9002',status:'requested',by:'fav',t:now0-3600000,flags:[],msgs:[]},
+      {id:'09000000002|9003',phone:'09000000002',code:'9003',status:'requested',by:'fav',t:now0-1800000,flags:[],msgs:[]}
+    ],
+    banners:[{id:uid(),label:'期間限定イベント',title:'[イベント名] 10/15〜10/31',color:'orange'},{id:uid(),label:'CAMPAIGN',title:'ホーム画面に追加で＋50J',color:'navy'}],
+    news:[{id:uid(),store:'PLUS 十三店',t:now0,title:'[例] 10月のシフト公開しました',body:'[お知らせ本文の例]'},{id:uid(),store:'熟女家 梅田店',t:now0-3*day,title:'[例] 体験動画を追加しました',body:'[お知らせ本文の例]'}].concat([[6,'全店舗','[例] 年末年始の営業について'],[11,'熟女家 京橋店','[例] 新人が入店しました'],[17,'PLUS 梅田店','[例] PLUSの日のご案内'],[24,'熟女家 堺東店','[例] 電話受付時間の変更'],[33,'全店舗','[例] J chatを始めました'],[45,'熟女家 ミナミ・エリア店','[例] 熟女の日のご案内'],[58,'PLUS 難波店','[例] 9月のイベント結果'],[75,'全店舗','[例] 2か月より前のお知らせ（表示されない）']].map(([d,st,ti])=>({id:uid(),store:st,t:now0-d*day,title:ti,body:'[お知らせ本文の例]'}))),
+    media:[{id:uid(),type:'体験動画',name:'[例]さくら',store:'熟女家 梅田店',t:now0},{id:uid(),type:'グラビア',name:'[例]みどり',store:'PLUS 十三店',t:now0-2*day}].concat([[5,'体験動画','[例]まい','PLUS 東大阪店'],[9,'グラビア','[例]あやか','PLUS 梅田店'],[14,'体験動画','[例]ゆり','熟女家 京橋店'],[21,'グラビア','[例]なつみ','熟女家 十三店'],[30,'体験動画','[例]れいこ','PLUS 難波店']].map(([d,ty,nm,st])=>({id:uid(),type:ty,name:nm,store:st,t:now0-d*day}))),
+    newbies:[{id:uid(),name:'[例]まい',store:'PLUS 東大阪店',t:now0-2*day}].concat(['あおい','かすみ','ちえ','ともこ','はるか','ひとみ','まどか','みき','ゆかり','よしえ','りえ','えみ','しずか','のりこ'].map((nm,i)=>({id:uid(),name:'[例]'+nm,store:STORES[(i*3)%STORES.length],t:now0-(i*2+1)*day}))),
+    reviews:[
+      {id:uid(),girl:'9001',sc:[5,5,5,4,5],stars:4.8,text:'[例] 優しく話を聞いてくれて、時間があっという間でした。',nick:'[例]常連A',phone:'09000000001',t:now0-2*day,status:'ok'},
+      {id:uid(),girl:'9002',sc:[5,4,4,4,5],stars:4.4,text:'[例] 写真の雰囲気どおりで安心しました。',nick:'[例]Bさん',phone:'09000000002',t:now0-3*day,status:'ok'},
+      {id:uid(),girl:'9003',sc:[5,5,4,5,5],stars:4.8,text:'[例] 新人さんとは思えない気配りでした。',nick:'[例]常連A',phone:'09000000001',t:now0-day,status:'pending'}],
+    posts:[
+      {id:uid(),cat:'公式',nick:'PLUS 十三店スタッフ',text:'[例] 今週末は「PLUSの日」です！',t:now0-1800000,official:true,reports:0,hidden:false,phone:null},
+      {id:uid(),cat:'感想',nick:'[例]常連A',text:'[例] 体験動画の更新が分かりやすくなりました。',t:now0-3*3600000,official:false,reports:0,hidden:false,phone:'09000000001'}],
+    requests:[{id:uid(),phone:'09000000001',type:'アポロのポイント交換',coins:300,status:'wait',t:now0-3600000}],
+    gNotices:[{id:uid(),title:'[例] 10月の店休日のご案内',body:'[本文の例]',store:'全店舗',t:now0-day}],
+    shifts:[], diaries:[], memos:[], gpReq:[],
+    missions:{weekly:true,on:true,bonus:30,list:[{id:'m1',k:'login',n:5,pt:10},{id:'m2',k:'diary',n:5,pt:30},{id:'m3',k:'reply',n:10,pt:20}]},
+    gacha:{on:true,free:1,cost:30,log:[],prizes:[
+      {id:'gp1',rank:'C',name:'Jコイン＋5J',kind:'coin',coin:5,rate:50,cap:0},
+      {id:'gp2',rank:'C',name:'Jコイン＋10J',kind:'coin',coin:10,rate:25,cap:0},
+      {id:'gp3',rank:'B',name:'[例]1,000円割引チケット',kind:'item',coin:0,rate:15,cap:0},
+      {id:'gp4',rank:'B',name:'口コミ1件無料チケット',kind:'item',coin:0,rate:7,cap:0},
+      {id:'gp5',rank:'A',name:'指名料無料チケット',kind:'item',coin:0,rate:2.5,cap:10},
+      {id:'gp6',rank:'S',name:'[例]女性の限定写真',kind:'item',coin:0,rate:0.5,cap:3}]},
+    match:{auto:true,n:30},
+    juku:{j:10,cap:10,sec:3,approve:false,videos:JUKU_SEED()},
+    columns:[{id:uid(),cat:'AI講座',title:'[例] AIで写メ日記の下書きを作るコツ',body:'[例] 今日あったことを3つ箇条書きにして「やわらかい口調で150文字の日記にして」と頼むだけで、下書きができます。\n\n最後に自分の言葉を一言足すと、ぐっと自然になります。',t:now0-2*day},{id:uid(),cat:'接客のコツ',title:'[例] 初めてのお客様との会話のきっかけ',body:'[本文の例]',t:now0-6*day}],
+    stats:{reg,baseReg:96,baseInstalled:38,tabs:{home:820,talk:210,reviews:340,coin:190},content:{news:180,media:420,newbie:310,banner:150,youtube:95},items:{}}
+  };
+}
+/* ===== サーバー（Firebase）接続 ===== */
+const FB_CONFIG = {apiKey:"AIzaSyC_J_57dCB6wLyKHVVboVg-qRPy8DSwgJQ",authDomain:"jcoin-test.firebaseapp.com",projectId:"jcoin-test",storageBucket:"jcoin-test.firebasestorage.app",messagingSenderId:"199008680309",appId:"1:199008680309:web:677da298f3f571da247b3c"};
+const LOCAL_KEYS=['ui','cur','gcur'];
+let S=seed(); try{const L=JSON.parse(localStorage.getItem(KEY+'-local'));if(L)LOCAL_KEYS.forEach(k=>{if(k in L)S[k]=L[k]})}catch(e){}
+const SHARED=Object.keys(S).filter(k=>!LOCAL_KEYS.includes(k));
+const last={}, PHOTOS={}; let ready=false, db=null, auth=null;
+const phSrc=p=>p&&String(p).startsWith('ph:')?(PHOTOS[p.slice(3)]||''):p;
+if(!S.missions||!S.missions.weekly)S.missions=seed().missions;
+if(!S.gacha)S.gacha=seed().gacha;
+function save(){
+  try{const L={};LOCAL_KEYS.forEach(k=>L[k]=S[k]);localStorage.setItem(KEY+'-local',JSON.stringify(L))}catch(e){}
+  if(!ready||!db)return;
+  const out=o=>{if(o&&typeof o.photo==='string'&&o.photo.startsWith('data:')){const id=uid(),d=o.photo;PHOTOS[id]=d;o.photo='ph:'+id;db.collection('photos').doc(id).set({d}).catch(e=>toast('写真を保存できませんでした（'+e.code+'）'))}};
+  (S.comps||[]).forEach(out);(S.newbies||[]).forEach(out);(S.banners||[]).forEach(out);
+  SHARED.forEach(k=>{const v=JSON.stringify(S[k]);if(v!==last[k]){last[k]=v;db.collection('state').doc(k).set({v,t:firebase.firestore.FieldValue.serverTimestamp()}).catch(e=>toast('サーバーに保存できませんでした（'+e.code+'）'))}});
+}
+function bootMsg(m){document.getElementById('app').innerHTML='<div class="card" style="max-width:560px;margin:32px auto;padding:20px;display:flex;flex-direction:column;gap:8px">'+m+'</div>'}
+function boot(){
+  if(!FB_CONFIG.apiKey){bootMsg('<b>Firebaseの設定コードがまだ入っていません。</b><span class="small muted">FB_CONFIG に設定コードを貼ってください。</span>');return}
+  firebase.initializeApp(FB_CONFIG); auth=firebase.auth(); db=firebase.firestore();
+  auth.settings.appVerificationDisabledForTesting=true;
+  bootMsg('<b>サーバーに接続中…</b>');
+  const fail=e=>bootMsg('<b>サーバーにつながりませんでした。</b><span class="small muted">'+esc((e&&e.code)||String(e))+'</span><span class="small muted">Firebaseの「匿名」ログインが有効か、データベースのルールが貼れているかを確認してください。</span>');
+  auth.onAuthStateChanged(async user=>{
+    if(!user){auth.signInAnonymously().catch(fail);return}
+    if(ready||db._started)return; db._started=true;
+    try{
+      const first=await db.collection('state').get();
+      if(first.empty){ready=true;save()}
+      db.collection('state').onSnapshot(qs=>{let ch=false;qs.docChanges().forEach(c=>{const k=c.doc.id;if(!SHARED.includes(k))return;const v=(c.doc.data()||{}).v;if(typeof v!=='string'||v===last[k])return;last[k]=v;try{S[k]=JSON.parse(v);ch=true}catch(e){}});if(!ready){ready=true;ch=true}if(ch)render()},fail);
+      db.collection('photos').onSnapshot(qs=>{qs.docChanges().forEach(c=>{if(c.type==='removed')delete PHOTOS[c.doc.id];else PHOTOS[c.doc.id]=(c.doc.data()||{}).d});if(ready)render()},()=>{});
+    }catch(e){fail(e)}
+  });
+}
+let lastSp=innerWidth<760;addEventListener('resize',()=>{const n=innerWidth<760;if(n!==lastSp){lastSp=n;if(S.ui.mode==='a')render()}});
+
+/* ===== 共通 ===== */
+const me=()=>S.cur?S.users[S.cur]:null;
+const gme=()=>S.gcur?S.comps.find(c=>c.code===S.gcur):null;
+const comp=code=>S.comps.find(c=>c.code===code)||{name:'[退店済み]',store:'',code};
+const room=(phone,code)=>S.rooms.find(r=>r.phone===phone&&r.code===code);
+const stars=x=>{const n=Math.max(0,Math.min(5,Math.round(x)));return '<span class="stars" aria-label="5点中'+(Math.round(x*10)/10)+'点">'+'★'.repeat(n)+'<span class="off">'+'★'.repeat(5-n)+'</span></span>'};
+function addCoins(u,v,r){u.coins+=v;u.history.unshift({t:Date.now(),v,r})}
+function toast(m){const r=document.getElementById('toast-root');r.innerHTML='<div class="toast">'+esc(m)+'</div>';clearTimeout(toast.t);toast.t=setTimeout(()=>r.innerHTML='',2400)}
+function ng(t){const s=String(t).replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-0xFEE0));
+  if(/\d[\d\-\s()]{8,}\d/.test(s))return '電話番号';
+  if(/line|ライン|ﾗｲﾝ|カカオ|kakao|インスタ|instagram|twitter|ツイッター|tiktok/i.test(s))return 'SNS・連絡先';
+  if(/[@＠]/.test(s))return 'メールアドレスやID'; if(/https?:|www\./i.test(s))return 'URL';
+  if(/店外|直引き|死ね|殺す/.test(s))return '禁止されている言葉'; return null}
+function sheet(h){document.getElementById('sheet-root').innerHTML='<div class="sheet-back" data-act="close-sheet"><div class="sheet" role="dialog" aria-modal="true">'+h+'</div></div>'}
+function closeSheet(){document.getElementById('sheet-root').innerHTML=''}
+const closeBtn='<button type="button" class="btn btn-ghost btn-sm" data-act="sheet-cancel">閉じる</button>';
+function track(kind,label){const st=S.stats;st.content[kind]=(st.content[kind]||0)+1;if(label)st.items[label]=(st.items[label]||0)+1}
+function view(u){if(!u)return;if(u.views.d!==today())u.views={d:today(),n:0};if(u.views.n<R.VIEW_CAP){u.views.n++;addCoins(u,R.VIEW,'コンテンツ閲覧');toast('閲覧ボーナス ＋'+R.VIEW+'J（本日 '+u.views.n+'/'+R.VIEW_CAP+'）')}}
+const isInstalled=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
+const IC={
+ home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',talk:'<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/>',
+ review:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',board:'<path d="M4 5h16v11H9l-5 4z"/>',
+ coin:'<circle cx="12" cy="12" r="8.5"/><path d="M13.5 8v5.5a2 2 0 0 1-4 0"/>',notice:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+ diary:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',memo:'<path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h6"/>',
+ shift:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+ search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/>'};
+const svg=k=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">'+IC[k]+'</svg>';
+const lockI='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function nav(tabs,cur,act){return '<nav class="c-nav" aria-label="メインメニュー">'+tabs.map(x=>'<button type="button" data-act="'+act+'" data-v="'+x[0]+'"'+(cur===x[0]?' aria-current="page"':'')+'>'+svg(x[2])+x[1]+(x[3]?'<span class="dot">'+x[3]+'</span>':'')+'</button>').join('')+'</nav>'}
+const activeComps=()=>S.comps.filter(c=>c.active);
+
+
+/* ===== ガチャ ===== */
+const GRK={S:'特賞',A:'大当たり',B:'当たり',C:'Jコイン'};
+const GCOL={S:'var(--wine)',A:'var(--orange)',B:'var(--gold)',C:'var(--muted)'};
+const gcMonth0=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1).getTime()};
+const gcWins=id=>{const m=gcMonth0();return S.gacha.log.filter(l=>l.pid===id&&l.t>=m).length};
+const gcPool=()=>S.gacha.prizes.filter(p=>p.rate>0&&(!p.cap||gcWins(p.id)<p.cap));
+const gcFreeLeft=u=>Math.max(0,S.gacha.free-(u.gc&&u.gc.d===today()?u.gc.n:0));
+const gcPct=x=>(Math.round(x*10)/10)+'%';
+function gcDraw(){const pool=gcPool(),tot=pool.reduce((a,p)=>a+p.rate,0);if(!tot)return null;let r=Math.random()*tot;for(const p of pool){r-=p.rate;if(r<0)return p}return pool[pool.length-1]}
+function gcMachine(cls){
+  const balls=[[70,62,'var(--orange)'],[100,50,'var(--gold)'],[130,64,'var(--wine)'],[84,92,'var(--navy)'],[116,94,'var(--ok)'],[100,76,'var(--orange-ink)'],[62,96,'var(--gold-ink)'],[138,98,'var(--orange)']];
+  return '<svg class="'+cls+'" viewBox="0 0 200 250" aria-hidden="true">'+
+   '<rect x="44" y="132" width="112" height="96" rx="14" style="fill:var(--navy)"/>'+
+   '<circle cx="100" cy="80" r="66" style="fill:var(--surface);stroke:var(--navy);stroke-width:5"/>'+
+   '<g class="balls">'+balls.map(b=>'<circle cx="'+b[0]+'" cy="'+b[1]+'" r="15" style="fill:'+b[2]+'"/>').join('')+'</g>'+
+   '<path d="M58 44 Q72 26 96 22" style="fill:none;stroke:var(--line);stroke-width:5;stroke-linecap:round"/>'+
+   '<g class="knob"><circle cx="100" cy="170" r="20" style="fill:var(--gold)"/><rect x="96" y="152" width="8" height="36" rx="4" style="fill:var(--gold-soft)"/></g>'+
+   '<rect x="118" y="198" width="30" height="22" rx="4" style="fill:var(--navy-deep)"/>'+
+   '<circle class="cap" cx="133" cy="238" r="11" style="fill:var(--gold);stroke:var(--surface);stroke-width:2"/>'+
+   '</svg>';
+}
+function cGachaHero(){const G=S.gacha,u=me();if(!G||!G.on)return '';const fl=gcFreeLeft(u);
+  return '<section class="sec"><button type="button" class="gc-hero" data-act="hv" data-v="gacha">'+gcMachine('gc-mini')+'<span class="t"><b>Jコインガチャ</b><span class="small muted">'+(fl?'今日の無料ガチャ　あと'+fl+'回':'無料ガチャは明日また回せます（'+G.cost+'Jでも回せます）')+'</span></span><span class="chip '+(fl?'chip-ok':'chip-wait')+'">回す ›</span></button></section>';}
+function cGacha(){
+  const G=S.gacha,u=me(),fl=gcFreeLeft(u),pool=gcPool(),tot=pool.reduce((a,p)=>a+p.rate,0)||1;
+  const rates=G.prizes.filter(p=>p.rate>0).map(p=>{const out=!pool.includes(p);return '<tr><td><span class="rk rk-'+p.rank+'">'+GRK[p.rank]+'</span></td><td>'+esc(p.name)+(out?' <span class="small muted">（今月は終了）</span>':'')+'</td><td>'+(out?'—':gcPct(p.rate/tot*100))+'</td></tr>'}).join('');
+  const mine=G.log.filter(l=>l.phone===u.phone).slice(0,5).map(l=>'<div class="kv"><span><span class="small muted">'+md(l.t)+'</span> '+esc(l.name)+'</span><span class="rk rk-'+l.rank+'">'+GRK[l.rank]+'</span></div>').join('')||'<div class="empty">まだ回していません</div>';
+  const low=u.coins<G.cost;
+  return subHead('Jコインガチャ','')+
+   (G.on?'<div class="card gc-stage" id="gc-stage">'+gcMachine('gc-machine')+
+     '<div class="gc-btns"><button type="button" class="btn btn-primary" data-act="gc-spin" data-v="free"'+(fl?'':' disabled')+'><span>無料で回す</span><span class="small">'+(fl?'今日あと'+fl+'回':'また明日')+'</span></button>'+
+     '<button type="button" class="btn btn-orange" data-act="gc-spin" data-v="pay"'+(low?' disabled':'')+'><span>'+G.cost+'Jで回す</span><span class="small">残高 '+yen(u.coins)+'J</span></button></div>'+
+     (low&&!fl?'<p class="small muted" style="margin:0;text-align:center">Jコインが足りません。ログインや口コミ投稿で貯まります。</p>':'')+'</div>'
+    :'<div class="card empty">ガチャはただいまお休み中です</div>')+
+   '<section class="sec"><h2 style="font-size:17px;font-weight:900">景品と当たる確率</h2><div class="card" style="padding:4px 12px"><table class="gc-rates"><thead><tr><th>ランク</th><th>景品</th><th>確率</th></tr></thead><tbody>'+rates+'</tbody></table></div><p class="small muted" style="margin:0">チケットはJコイン画面の「持ち物」に入ります。ご予約の電話・受付でお伝えください。</p></section>'+
+   '<section class="sec"><h2 style="font-size:17px;font-weight:900">あなたの結果</h2><div class="card list">'+mine+'</div></section>';
+}
+function gcApply(d){const G=S.gacha;G.on=d.on!=='0';G.free=Math.max(0,Math.floor(+d.free||0));G.cost=Math.max(1,Math.floor(+d.cost||1));
+  G.prizes.forEach((p,i)=>{if(d['name'+i]==null)return;p.rank='SABC'.includes(d['rank'+i])?d['rank'+i]:p.rank;p.name=String(d['name'+i]).trim().slice(0,40)||p.name;p.kind=d['kind'+i]==='item'?'item':'coin';p.coin=Math.max(0,Math.floor(+d['coin'+i]||0));p.rate=Math.max(0,+d['rate'+i]||0);p.cap=Math.max(0,Math.floor(+d['cap'+i]||0))});}
+function gcFormSync(){const fm=document.querySelector('form[data-form="gc-save"]');if(fm)gcApply(Object.fromEntries(new FormData(fm)))}
+function aGacha(){
+  const G=S.gacha,m0=gcMonth0(),ml=G.log.filter(l=>l.t>=m0),sum=G.prizes.reduce((a,p)=>a+(+p.rate||0),0);
+  const pz=id=>G.prizes.find(x=>x.id===id);
+  const givenJ=ml.reduce((a,l)=>{const p=pz(l.pid);return a+(p&&p.kind==='coin'?p.coin:0)},0);
+  const tickets=ml.filter(l=>{const p=pz(l.pid);return p&&p.kind==='item'}).length;
+  const opt=(v,l,cur)=>'<option value="'+v+'"'+(v===cur?' selected':'')+'>'+l+'</option>';
+  const rows=G.prizes.map((p,i)=>'<tr><td><select class="input" id="gr'+i+'" name="rank'+i+'" aria-label="ランク">'+'SABC'.split('').map(r=>opt(r,r+'（'+GRK[r]+'）',p.rank)).join('')+'</select></td>'+
+    '<td><input class="input" id="gn'+i+'" name="name'+i+'" maxlength="40" value="'+esc(p.name)+'" aria-label="景品の名前"></td>'+
+    '<td><select class="input" id="gk'+i+'" name="kind'+i+'" aria-label="種類">'+opt('coin','Jコイン',p.kind)+opt('item','チケット・景品',p.kind)+'</select></td>'+
+    '<td><input class="input num" type="number" min="0" id="gj'+i+'" name="coin'+i+'" value="'+(p.coin||0)+'" aria-label="もらえるJ"></td>'+
+    '<td><input class="input num" type="number" min="0" step="0.1" id="gp'+i+'" name="rate'+i+'" value="'+p.rate+'" aria-label="確率"></td>'+
+    '<td><input class="input num" type="number" min="0" id="gc'+i+'" name="cap'+i+'" value="'+(p.cap||'')+'" placeholder="なし" aria-label="月の上限"></td>'+
+    '<td class="num">'+gcWins(p.id)+(p.cap?' / '+p.cap:'')+'</td>'+
+    '<td><button type="button" class="btn btn-danger btn-sm" data-act="gc-del" data-v="'+p.id+'">削除</button></td></tr>').join('');
+  const log=G.log.slice(0,15).map(l=>'<tr><td>'+md(l.t)+'</td><td class="num">'+mask(l.phone)+'</td><td><span class="rk rk-'+l.rank+'">'+GRK[l.rank]+'</span> '+esc(l.name)+'</td><td>'+(l.free?'無料':G.cost+'J')+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">まだ回されていません</td></tr>';
+  return '<h1>ガチャ</h1><div class="stats">'+stat('今月回された回数',ml.length+'回','無料 '+ml.filter(l=>l.free).length+'回・J '+ml.filter(l=>!l.free).length+'回')+stat('ガチャで使われたJ',yen(ml.filter(l=>!l.free).length*G.cost)+'J')+stat('景品で配ったJ',yen(givenJ)+'J')+stat('チケットの当選',tickets+'枚')+'</div>'+
+   '<form class="card panel" data-form="gc-save"><h2>基本の設定</h2><div class="form-grid">'+
+    '<div class="field"><label for="gc-on">お客様への公開</label><select class="input" id="gc-on" name="on">'+opt('1','公開する',G.on?'1':'0')+opt('0','お休みにする',G.on?'1':'0')+'</select></div>'+
+    '<div class="field"><label for="gc-free">無料で回せる回数（1日）</label><input class="input num" type="number" min="0" id="gc-free" name="free" value="'+G.free+'"></div>'+
+    '<div class="field"><label for="gc-cost">1回に使うJコイン</label><input class="input num" type="number" min="1" id="gc-cost" name="cost" value="'+G.cost+'"></div></div>'+
+   '<h2>景品と確率</h2><div class="tbl-wrap"><table class="gc-tbl"><thead><tr><th>ランク</th><th>景品の名前</th><th>種類</th><th>もらえるJ</th><th>確率（%）</th><th>月の上限</th><th>今月の当選</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+   '<p class="note"'+(Math.abs(sum-100)>0.01?' style="color:var(--danger)"':'')+'>確率の合計：<b class="num">'+gcPct(sum)+'</b>'+(Math.abs(sum-100)>0.01?'（100%になっていません。このままでも比率で計算しますが、お客様に見せる確率は自動で100%に直して表示されます）':'')+'。月の上限に達した景品は自動で出なくなり、残りの景品で確率を分け直します。「もらえるJ」は種類がJコインのときだけ使います。</p>'+
+   '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="submit" class="btn btn-primary">保存する</button><button type="button" class="btn btn-ghost" data-act="gc-add">景品を追加</button></div></form>'+
+   '<div class="card panel"><h2>最近の結果</h2><div class="tbl-wrap"><table><thead><tr><th>日付</th><th>お客様</th><th>結果</th><th>回し方</th></tr></thead><tbody>'+log+'</tbody></table></div><p class="note">チケットが当たったお客様は、ご予約の電話・受付で申し出ます。電話番号の下4桁で確認してください。</p></div>';
+}
+
+
+/* ===== v20：好み・マッチング ===== */
+const AGE_SELF=['30代','40代','50代','60代','70代以上'];
+const P_BODY=['スレンダー','普通','ぽっちゃり','グラマー'];
+const P_AGE=[['〜34歳',0,34],['35〜44歳',35,44],['45〜54歳',45,54],['55歳〜',55,99]];
+const P_CUP=[['A〜C','ABC'],['D〜E','DE'],['F以上','FGHIJK']];
+const FETS=JG.map(x=>x[1]);
+const BY={staff:'店舗で相互お気に入り',fav:'お気に入り申請',match:'自動マッチング'};
+function matchScore(u,c){const a=u&&u.attr;if(!a||!c)return null;let tot=0,hit=0;
+  if(a.body&&a.body.length){tot++;if(c.body&&a.body.includes(c.body))hit++}
+  if(a.age&&a.age.length){tot++;if(c.age&&a.age.some(k=>{const r=P_AGE.find(x=>x[0]===k);return r&&c.age>=r[1]&&c.age<=r[2]}))hit++}
+  if(a.cup&&a.cup.length){tot++;if(c.cup&&a.cup.some(k=>{const r=P_CUP.find(x=>x[0]===k);return r&&r[1].includes(c.cup)}))hit++}
+  if(a.fet&&a.fet.length){tot++;const f=(c.fet||[]).filter(x=>a.fet.includes(x)).length;hit+=Math.min(1,f/Math.min(a.fet.length,2))}
+  if(a.stores&&a.stores.length){tot+=.5;if(a.stores.includes(c.store))hit+=.5}
+  return tot?Math.round(hit/tot*100):null}
+function autoMatch(u){const M=S.match;if(!M||!M.auto)return 0;
+  const list=activeComps().filter(c=>talkAvail(c)&&!room(u.phone,c.code)).map(c=>({c,s:matchScore(u,c)||0})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,Math.max(0,M.n|0));
+  list.forEach(x=>S.rooms.push({id:u.phone+'|'+x.c.code,phone:u.phone,code:x.c.code,status:'open',by:'match',t:Date.now(),flags:[],msgs:[]}));return list.length}
+function chatBlock(u,r){if(u.limited)return '現在、ご利用が制限されています。店舗にお問い合わせください。';
+  const t0=new Date();t0.setHours(0,0,0,0);const n=r.msgs.filter(m=>m.from==='u'&&m.t>=t0.getTime()).length;const last=r.msgs[r.msgs.length-1];
+  if(n>=R.MSG_DAY)return '今日はこの女性に'+R.MSG_DAY+'通送りました。また明日送れます。';
+  if(last&&last.from==='u')return '女性からの返信が届いたら、次のメッセージを送れます。';
+  return null}
+const ck=(name,val,on,type)=>'<label class="ck"><input type="'+(type||'checkbox')+'" name="'+name+'" value="'+esc(val)+'"'+(on?' checked':'')+'><span>'+esc(val)+'</span></label>';
+function cOnboard(edit){const u=me(),a=u.attr||{};const has=(k,v)=>(a[k]||[]).includes(v);
+  const grp=(title,list)=>'<span class="grp-l">'+title+'</span>'+list.map(st=>ck('stores',st,has('stores',st))).join('');
+  return '<form class="ob" data-form="onboard" data-edit="'+(edit?1:0)+'">'+
+   (edit?subHead('好みの設定',''):'<div><h1 class="pg-h">はじめに教えてください</h1><p class="small muted" style="margin:6px 0 0">あなたに合う女性を見つけるために使います。あとから変えられます。</p></div>')+
+   '<fieldset><legend>あなたの年齢</legend><div class="ckgrid">'+AGE_SELF.map(x=>ck('self',x,a.self===x,'radio')).join('')+'</div></fieldset>'+
+   '<fieldset><legend>よく使う店舗 <span class="small muted">（いくつでも）</span></legend><div class="ckgrid">'+grp('熟女家',STORES.filter(x=>x.startsWith('熟女家')))+grp('PLUS',STORES.filter(x=>x.startsWith('PLUS')))+'</div></fieldset>'+
+   '<fieldset><legend>好みの体型 <span class="small muted">（いくつでも）</span></legend><div class="ckgrid">'+P_BODY.map(x=>ck('body',x,has('body',x))).join('')+'</div></fieldset>'+
+   '<fieldset><legend>好みの年齢 <span class="small muted">（いくつでも）</span></legend><div class="ckgrid">'+P_AGE.map(x=>ck('age',x[0],has('age',x[0]))).join('')+'</div></fieldset>'+
+   '<fieldset><legend>好みのカップ <span class="small muted">（いくつでも）</span></legend><div class="ckgrid">'+P_CUP.map(x=>ck('cup',x[0],has('cup',x[0]))).join('')+'</div></fieldset>'+
+   '<fieldset><legend>好きなジャンル <span class="small muted">（いくつでも）</span></legend><div class="ckgrid">'+FETS.map(x=>ck('fet',x,has('fet',x))).join('')+'</div></fieldset>'+
+   '<p class="err" id="ob-err"></p><button class="btn btn-primary" type="submit">'+(edit?'保存する':'はじめる')+'</button>'+
+   (!edit&&S.match.auto?'<p class="hint">「はじめる」を押すと、好みに合う女性（最大'+S.match.n+'人）とJ chatがすぐにつながります。</p>':'')+'</form>';}
+
+/* ===== v20：熟フェチ図鑑 ===== */
+const VID={};
+const jkName=k=>(JG.find(x=>x[0]===k)||['',''])[1];
+const jkList=k=>S.juku.videos.filter(v=>v.g===k&&v.status==='on'&&S.comps.some(c=>c.code===v.code&&c.active)).sort((a,b)=>b.t-a.t);
+function jkToday(u){if(!u.jk||u.jk.d!==today())u.jk={d:today(),ids:[]};return u.jk}
+function cJukuSec(){const u=me(),J=S.juku,jt=jkToday(u),nw=JG.some(([k])=>jkList(k).some(v=>v.t>Date.now()-3*day));
+  return '<section class="sec"><button type="button" class="js-hero" data-act="hv" data-v="jshorts"><span class="js-ic"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span><span class="t"><b>熟フェチ図鑑'+(nw?' <span class="js-new">NEW</span>':'')+'</b><span class="small">ジャンル別の縦動画。見ると <b>＋'+J.j+'J</b>（今日 '+jt.ids.length+'/'+J.cap+'）</span></span><span class="js-go">見る ›</span></button></section>';}
+function cJShorts(){const u=me(),J=S.juku,jt=jkToday(u);
+  return subHead('熟フェチ図鑑','')+'<p class="small muted" style="margin:0">見たいジャンルを選んでください。縦動画が始まり、上下にスワイプで次の動画へ進みます。'+J.sec+'秒見ると <span class="coin">＋'+J.j+'J</span>（今日 '+jt.ids.length+'/'+J.cap+'本）。</p><div class="jk-grid">'+
+   JG.map(([k,l],i)=>{const vs=jkList(k),nw=vs.some(v=>v.t>Date.now()-3*day);return '<button type="button" class="jk-tile jk'+i+'" data-act="jv-open" data-v="'+k+'">'+(nw?'<span class="new">NEW</span>':'')+'<span class="pl"><svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span><b>'+esc(l)+'</b><span>'+vs.length+'本</span></button>'}).join('')+'</div>';}
+let jvIO=null,jvT=null,jvCur=null;
+function jvOpen(k){const u=me(),J=S.juku,list=jkList(k);let root=document.getElementById('jv-root');if(!root){root=document.createElement('div');root.id='jv-root';document.body.appendChild(root)}
+  const bgs=['#1d2c44','#3a1a2b','#2e2410','#3b1c08','#231a38','#123029'];
+  const slides=list.map((v,i)=>{const c=comp(v.code),src=VID[v.id];
+    return '<section class="jv-slide" data-id="'+v.id+'" style="background:radial-gradient(circle at 50% 35%,'+bgs[(i+JG.findIndex(x=>x[0]===k))%6]+',#000 75%)">'+
+     (src&&v.kind==='video'?'<video src="'+src+'" muted loop playsinline preload="metadata"></video>':'')+
+     (!src||v.kind!=='video'?'<div class="jv-ph"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span><b style="font-size:17px">'+esc(jkName(k))+'</b><span class="small" style="opacity:.75">サンプル'+(v.kind==='voice'?'音声':'動画')+'（本番は10〜15秒の縦動画）</span></div>':'')+
+     (src&&v.kind==='voice'?'<audio src="'+src+'" controls preload="metadata"></audio>':'')+
+     '<div class="jv-who"><button type="button" class="jv-name" data-act="girl-sheet" data-v="'+esc(c.code)+'">'+av(c,32)+esc(c.store)+'　'+esc(c.name)+' ›</button><button type="button" class="jv-prof" data-act="girl-sheet" data-v="'+esc(c.code)+'">プロフィールを見る ›</button></div>'+
+     (i===0&&list.length>1?'<div class="jv-hint" aria-hidden="true"><span>↑</span><span>上下に<br>スワイプ</span><span>↓</span></div>':'')+'<div class="jv-prog"><i></i></div></section>'}).join('')||'<div class="jv-empty">このジャンルの動画はまだありません</div>';
+  root.innerHTML='<div class="jv" role="dialog" aria-modal="true" aria-label="熟フェチ図鑑 '+esc(jkName(k))+'"><div class="jv-in"><div class="jv-top"><button type="button" class="jv-x" data-act="jv-close" aria-label="閉じる">×</button><b style="flex:1;text-align:center;font-size:14px">'+esc(jkName(k))+'</b><span class="jv-bal"><span class="jmark">J</span><span class="num" id="jv-bal">'+yen(u.coins)+'</span></span></div><div class="jv-feed" id="jv-feed" tabindex="0">'+slides+'</div></div></div>';
+  document.body.style.overflow='hidden';
+  const fd=document.getElementById('jv-feed');fd.focus({preventScroll:true});
+  if(jvIO)jvIO.disconnect();
+  jvIO=new IntersectionObserver(es=>es.forEach(e=>{const sl=e.target,md=sl.querySelector('video,audio'),pr=sl.querySelector('.jv-prog i');
+    if(e.isIntersecting&&e.intersectionRatio>=.6){if(md&&md.tagName==='VIDEO')md.play().catch(()=>{});if(jvCur!==sl){clearTimeout(jvT);jvCur=sl;
+        if(pr){pr.style.transition='none';pr.style.width='0';void pr.offsetWidth;pr.style.transition='width '+J.sec+'s linear';pr.style.width='100%'}
+        jvT=setTimeout(()=>jvEarn(sl),J.sec*1000)}}
+    else{if(md)md.pause();if(jvCur===sl){clearTimeout(jvT);jvCur=null}if(pr){pr.style.transition='none';pr.style.width='0'}}}),{root:fd,threshold:[0,.6]});
+  fd.querySelectorAll('.jv-slide').forEach(x=>jvIO.observe(x));
+}
+function jvEarn(sl){const u=me(),J=S.juku;if(!u)return;const jt=jkToday(u),id=sl.dataset.id;let m='';
+  if(jt.ids.includes(id))m='';else if(jt.ids.length>=J.cap)m=jt.capShown?'':(jt.capShown=true,'今日の上限（'+J.cap+'本）に達しました');
+  else{jt.ids.push(id);addCoins(u,J.j,'熟フェチ図鑑を見る');track('juku');m='＋'+J.j+'J'}
+  save();const b=document.getElementById('jv-bal');if(b)b.textContent=yen(u.coins);
+  if(m){const f=document.createElement('div');f.className='jv-earn';f.textContent=m;sl.appendChild(f);setTimeout(()=>f.remove(),1900)}}
+function jvClose(){if(jvIO){jvIO.disconnect();jvIO=null}clearTimeout(jvT);jvCur=null;const r=document.getElementById('jv-root');if(r)r.innerHTML='';document.body.style.overflow=''}
+function girlSheet(code){const u=me(),c=comp(code),r=u&&room(u.phone,c.code),ms=matchScore(u,c);
+  const act=!u?'':r&&r.status==='open'&&c.active?'<button type="button" class="btn btn-primary btn-sm" data-act="open-chat" data-v="'+esc(c.code)+'">トークする</button>':r&&pend(r)?'<span class="chip chip-wait">女性の承認待ち</span>':r?'<span class="small muted">トークできません</span>':!talkAvail(c)?'<span class="small muted">トーク受付なし</span>':'<button type="button" class="btn btn-ghost btn-sm" data-act="fav" data-v="'+esc(c.code)+'">♡ お気に入り申請</button>';
+  sheet('<div class="sec-h"><h3>'+esc(c.name)+'</h3>'+closeBtn+'</div><div style="display:flex;gap:14px;align-items:center">'+rectPh(c.photo,96,c.name+'の写真')+'<div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span class="small muted">'+esc(c.store)+'</span><b>'+esc(prof(c)||'')+'</b>'+(c.body?'<span class="small">体型：'+esc(c.body)+'</span>':'')+(ms!=null?'<span class="chip chip-match" style="align-self:flex-start">相性 '+ms+'%</span>':'')+'<span style="display:flex;gap:4px;flex-wrap:wrap">'+tags(c)+'</span></div></div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+profLink(c,'サイトのプロフィール')+act+'</div>')}
+function aJuku(){const J=S.juku,mineStore=activeComps().filter(c=>c.store===S.ui.store),pool=mineStore.length?mineStore:activeComps();
+  const st=v=>{const c=S.comps.find(x=>x.code===v.code);return c&&!c.active?'<span class="chip chip-ng">退店で非表示</span>':v.status==='on'?'<span class="chip chip-ok">公開中</span>':v.status==='wait'?'<span class="chip chip-wait">承認待ち</span>':'<span class="chip chip-ng">停止中</span>'};
+  const rows=S.juku.videos.slice().sort((a,b)=>b.t-a.t).map(v=>{const c=comp(v.code);return '<tr><td>'+md(v.t)+'</td><td>'+esc(jkName(v.g))+'</td><td>'+esc(c.name)+'</td><td>'+esc(c.store)+'</td><td>'+(v.kind==='voice'?'音声':'動画')+(VID[v.id]?'（ファイルあり）':'')+'</td><td>'+st(v)+'</td><td class="act">'+(v.status==='wait'?'<button class="btn btn-primary btn-sm" data-act="jk-st" data-v="'+v.id+'" data-s="on">承認</button> ':'')+(v.status==='on'?'<button class="btn btn-ghost btn-sm" data-act="jk-st" data-v="'+v.id+'" data-s="off">停止</button> ':v.status==='off'?'<button class="btn btn-ghost btn-sm" data-act="jk-st" data-v="'+v.id+'" data-s="on">再開</button> ':'')+'<button class="btn btn-danger btn-sm" data-act="jk-del" data-v="'+v.id+'">削除</button></td></tr>'}).join('')||'<tr><td colspan="7" class="muted">まだ投稿はありません</td></tr>';
+  return '<h1>熟フェチ図鑑</h1><div class="stats">'+JG.map(([k,l])=>stat(l,jkList(k).length+'本','公開中')).join('')+'</div>'+
+   '<form class="card panel" data-form="jk-post"><h2>動画を投稿（'+esc(S.ui.store)+'）</h2><div class="form-grid">'+
+    '<div class="field"><label for="jk-code">女性</label><select class="input" id="jk-code" name="code">'+pool.map(c=>'<option value="'+esc(c.code)+'">'+esc(c.name)+'（'+esc(c.store)+'）</option>').join('')+'</select></div>'+
+    '<div class="field"><label for="jk-g">ジャンル</label><select class="input" id="jk-g" name="g">'+JG.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'+
+    '<div class="field"><label for="jk-file">縦動画・音声のファイル</label><input class="input" id="jk-file" type="file" accept="video/*,audio/*"></div></div>'+
+    '<p class="note">10〜15秒ほどの縦動画、または音声。スマホで撮ったままでOK（テロップ・BGMの編集は不要）。<br>試作では、選んだファイルはこの画面を開いている間だけ再生できます（保存はしません）。ファイルなしで投稿すると、サンプル表示になります。</p>'+
+    '<div><button class="btn btn-primary" type="submit">投稿する</button></div></form>'+
+   '<form class="card panel" data-form="jk-set"><h2>Jコインと公開の設定</h2><div class="form-grid">'+
+    '<div class="field"><label for="jk-j">1本見るともらえるJ</label><input class="input num" type="number" min="0" id="jk-j" name="j" value="'+J.j+'"></div>'+
+    '<div class="field"><label for="jk-cap">1日にもらえる本数の上限</label><input class="input num" type="number" min="0" id="jk-cap" name="cap" value="'+J.cap+'"></div>'+
+    '<div class="field"><label for="jk-sec">何秒見たらもらえるか</label><input class="input num" type="number" min="1" max="30" id="jk-sec" name="sec" value="'+J.sec+'"></div>'+
+    '<div class="field"><label for="jk-ap">投稿の公開</label><select class="input" id="jk-ap" name="approve"><option value="0"'+(J.approve?'':' selected')+'>すぐ公開する</option><option value="1"'+(J.approve?' selected':'')+'>本部が承認してから公開</option></select></div></div>'+
+    '<p class="note">同じ動画は1日1回だけもらえます。投稿のペースに合わせて、ここで調整してください。</p><div><button class="btn btn-primary" type="submit">保存する</button></div></form>'+
+   '<div class="card panel"><h2>投稿一覧</h2><div class="tbl-wrap"><table><thead><tr><th>投稿日</th><th>ジャンル</th><th>女性</th><th>店舗</th><th>種類</th><th>状態</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">女性を名簿で「退店」にすると、その女性の動画も自動で表示されなくなります。</p></div>';}
+
+/* ===== v20：女性のタイマー ===== */
+const TM_COURSES=[60,70,90,120,150];
+let tmCtx=null;
+const tmS=()=>{S.ui.tm=S.ui.tm||{dur:60,alert:10,end:null,left:null,run:false,a1:false,a2:false};return S.ui.tm};
+const tmLeft=()=>{const t=tmS();return t.run?t.end-Date.now():(t.left!=null?t.left:t.dur*60000)};
+const tmFmt=ms=>{const neg=ms<0,a=Math.abs(Math.round(ms/1000)),h=Math.floor(a/3600),m=Math.floor(a%3600/60),x=a%60;return (neg?'+':'')+(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+function tmBeep(n){try{tmCtx=tmCtx||new (window.AudioContext||window.webkitAudioContext)();for(let i=0;i<n;i++){const o=tmCtx.createOscillator(),g=tmCtx.createGain();o.frequency.value=880;g.gain.value=.18;o.connect(g);g.connect(tmCtx.destination);const t0=tmCtx.currentTime+i*.45;o.start(t0);o.stop(t0+.25)}}catch(e){}try{navigator.vibrate&&navigator.vibrate(n>1?[300,150,300,150,300]:[300])}catch(e){}}
+function gTimer(){const t=tmS(),left=tmLeft(),tot=t.dur*60000,C=2*Math.PI*100,off=C*Math.min(1,Math.max(0,1-left/tot));
+  const cls=left<0?' over':left<=t.alert*60000?' warn':'';
+  const endAt=t.run?hm(t.end):'';
+  return '<h1 class="pg-h">タイマー</h1><div class="card tm"><div class="tm-ring'+cls+'" id="tm-ring"><svg viewBox="0 0 220 220" aria-hidden="true"><circle class="bg" cx="110" cy="110" r="100"/><circle class="fg" id="tm-fg" cx="110" cy="110" r="100" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'"/></svg><div class="tm-mid"><span class="small muted">'+t.dur+'分コース</span><span class="tm-left" id="tm-left" role="timer" aria-live="off">'+tmFmt(left)+'</span><span class="small muted" id="tm-end">'+(endAt?'終了予定 '+endAt:t.left!=null?'一時停止中':'スタートを押すと開始')+'</span></div></div>'+
+   '<div id="tm-msg" style="width:100%">'+tmMsg(left)+'</div>'+
+   '<div class="tm-btns">'+(t.run?'<button type="button" class="btn btn-ghost" data-act="tm-pause">一時停止</button>':'<button type="button" class="btn btn-primary" data-act="tm-start">'+(t.left!=null?'再開':'スタート')+'</button>')+'<button type="button" class="btn btn-ghost" data-act="tm-add">＋10分</button><button type="button" class="btn btn-ghost" data-act="tm-reset">リセット</button></div></div>'+
+   '<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px"><b>コース</b><div class="pillrow">'+TM_COURSES.map(m=>'<button type="button" class="pill" data-act="tm-dur" data-v="'+m+'" aria-pressed="'+(t.dur===m)+'">'+m+'分</button>').join('')+'</div>'+
+   '<form data-form="tm-custom" style="display:flex;gap:8px;align-items:center"><label for="tm-min" class="small">ほかの時間</label><input class="input num" id="tm-min" name="min" type="number" min="5" max="600" placeholder="分" style="width:90px"><button class="btn btn-ghost btn-sm" type="submit">決める</button></form>'+
+   '<b>終わる前のお知らせ</b><div class="pillrow">'+[5,10,15].map(m=>'<button type="button" class="pill" data-act="tm-al" data-v="'+m+'" aria-pressed="'+(t.alert===m)+'">'+m+'分前</button>').join('')+'</div></div>'+
+   '<p class="note">画面を閉じても時間は進みます（開き直すと残り時間が表示されます）。終わる'+t.alert+'分前と終了時に、音とバイブ（対応している端末のみ）でお知らせします。コースの途中で変えるときは、いったんリセットしてください。</p>';}
+function tmMsg(left){const t=tmS();if(t.left==null&&!t.run)return '';if(left<0)return '<div class="tm-msg over">終了時間を過ぎています</div>';if(left<=t.alert*60000)return '<div class="tm-msg">終了'+t.alert+'分前です</div>';return ''}
+setInterval(()=>{const t=S.ui&&S.ui.tm;if(!t||!t.run)return;const left=tmLeft();
+  if(!t.a1&&left<=t.alert*60000&&left>0){t.a1=true;tmBeep(1);toast('終了'+t.alert+'分前です');save()}
+  if(!t.a2&&left<=0){t.a2=true;tmBeep(3);toast('終了時間です');save()}
+  if(S.ui.mode==='g'&&S.ui.gTab==='timer'){const l=document.getElementById('tm-left');if(!l)return;l.textContent=tmFmt(left);
+    const C=2*Math.PI*100,fg=document.getElementById('tm-fg');if(fg)fg.setAttribute('stroke-dashoffset',(C*Math.min(1,Math.max(0,1-left/(t.dur*60000)))).toFixed(1));
+    const rg=document.getElementById('tm-ring');if(rg)rg.className='tm-ring'+(left<0?' over':left<=t.alert*60000?' warn':'');
+    const ms=document.getElementById('tm-msg');if(ms)ms.innerHTML=tmMsg(left)}},1000);
+
+/* ===== v20：コラム（女性向け） ===== */
+const COL_CATS=['AI講座','接客のコツ','お知らせ','その他'];
+function gColumns(){const l=(S.columns||[]).slice().sort((a,b)=>b.t-a.t);
+  return '<section style="display:flex;flex-direction:column;gap:8px"><div class="sec-h"><h2 style="font-size:16px">コラム</h2><span class="small muted">'+l.length+'件</span></div>'+(l.length?'<div class="card list col-list">'+l.map(c=>'<button type="button" class="row-btn" data-act="col-open" data-v="'+c.id+'"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span><span class="chip chip-wait">'+esc(c.cat)+'</span> <span class="small muted">'+md(c.t)+'</span></span><b>'+esc(c.title)+'</b></span><span class="muted">›</span></button>').join('')+'</div>':'<div class="card empty">コラムはまだありません</div>')+'</section>';}
+function aGColumn(){return '<h1>コラム（女性向け）</h1><form class="card panel" data-form="column"><h2>コラムを書く</h2><div class="form-grid"><div class="field"><label for="co-cat">カテゴリ</label><select class="input" id="co-cat" name="cat">'+COL_CATS.map(c=>'<option>'+c+'</option>').join('')+'</select></div><div class="field" style="grid-column:span 2"><label for="co-t">タイトル</label><input class="input" id="co-t" name="title" maxlength="40" required></div></div><div class="field"><label for="co-b">本文</label><textarea class="input" id="co-b" name="body" rows="6" required></textarea></div><p class="note">全店舗の女性のマイページ「お知らせ」の下に表示されます。</p><div><button class="btn btn-primary" type="submit">公開する</button></div></form>'+
+  '<div class="card panel"><h2>公開中のコラム</h2><div class="tbl-wrap"><table><tbody>'+((S.columns||[]).slice().sort((a,b)=>b.t-a.t).map(c=>'<tr><td>'+md(c.t)+'</td><td>'+esc(c.cat)+'</td><td>'+esc(c.title)+'</td><td class="act">'+delBtn('column',c.id)+'</td></tr>').join('')||'<tr><td class="muted">まだありません</td></tr>')+'</tbody></table></div></div>'}
+const RV_ITEMS=['写真との一致','接客','会話','サービス','清潔感'];
+const rvSc=r=>r.sc||Array(5).fill(r.stars||0);
+const rvAvg=r=>{const a=rvSc(r);return a.reduce((x,y)=>x+y,0)/a.length};
+
+/* ===== 女性を探す（並べ替え・絞り込み） ===== */
+const CUPS='ABCDEFGHIJK';
+const SORTS=[['match','相性の高い順'],['age-asc','年齢の低い順'],['age-desc','年齢の高い順'],['h-asc','身長の低い順'],['h-desc','身長の高い順'],['cup-asc','カップの小さい順'],['cup-desc','カップの大きい順'],['kana','あいうえお順']];
+const FLTS=[['hotel','ホテルデリOK'],['home','自宅デリOK'],['nosmoke','タバコを吸わない']];
+const cupN=c=>c.cup&&CUPS.includes(c.cup.toUpperCase())?CUPS.indexOf(c.cup.toUpperCase()):null;
+const pend=r=>r.status==='store'||r.status==='requested';
+const rvOpen=(u,r)=>u.unlocked.includes(r.id)||r.phone===u.phone;
+const talkAvail=c=>!!c.talkOn&&!c.selfOff;
+const STORE_TOP=st=>JK[st]?'https://'+JK[st]+'.jukujoya.jp/':(SITE[st]?SITE[st].replace('ms_lady/',''):null);
+function searchList(){
+  if(!S.ui.flt)S.ui.flt={};
+  const f=S.ui.flt, q=(S.ui.q||'').trim(); let l=activeComps().filter(c=>FLTS.every(([k])=>!f[k]||c[k])&&(!S.ui.sStore||c.store===S.ui.sStore)&&(!q||c.name.includes(q)||(c.kana||'').includes(q)));
+  const by=(get,dir)=>(a,b)=>{const x=get(a),y=get(b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return dir*(x-y)};
+  const s=S.ui.sort;
+  if(s==='age-asc')l.sort(by(c=>c.age,1)); if(s==='age-desc')l.sort(by(c=>c.age,-1));
+  if(s==='h-asc')l.sort(by(c=>c.height,1)); if(s==='h-desc')l.sort(by(c=>c.height,-1));
+  if(s==='cup-asc')l.sort(by(cupN,1)); if(s==='cup-desc')l.sort(by(cupN,-1));
+  if(s==='kana')l.sort((a,b)=>(a.kana||a.name).localeCompare(b.kana||b.name,'ja'));
+  if(s==='match'){const u=me();l.sort((a,b)=>(matchScore(u,b)||0)-(matchScore(u,a)||0))}
+  return l;
+}
+/* サイトのプロフィールURL（PLUS：担当者コード＝URLの最後／熟女家：ひも付けたサイトID） */
+const SITE={'PLUS 梅田店':'https://jukujoya-plus.jp/umeda/ms_lady/','PLUS 十三店':'https://jukujoya-plus.jp/juso/ms_lady/','PLUS 難波店':'https://jukujoya-plus.jp/namba/ms_lady/','PLUS 東大阪店':'https://jukujoya-plus.jp/takaida/ms_lady/'};
+const JK={'熟女家 梅田店':'umeda','熟女家 十三店':'juso','熟女家 京橋店':'kyobashi','熟女家 堺東店':'sakai','熟女家 豊中蛍池店':'ho','熟女家 東大阪店':'fuse','熟女家 ミナミ・エリア店':'ueroku'};
+const siteUrl=c=>{
+  if(c.siteId&&JK[c.store])return 'https://'+JK[c.store]+'.jukujoya.jp/ms_lady/detail/'+c.siteId+'/';
+  const base=SITE[c.store];if(base&&/^\d+$/.test(c.code)&&!String(c.name).startsWith('[例]'))return base+c.code;
+  return null};
+const profLink=(c,label)=>{const u=siteUrl(c);return u?'<a class="btn btn-ghost btn-sm" href="'+esc(u)+'" target="_blank" rel="noopener">'+(label||'プロフィール')+'</a>':''};
+const av=(c,z)=>c&&phSrc(c.photo)?'<img src="'+phSrc(c.photo)+'" alt="'+esc(c.name)+'の写真" style="width:'+z+'px;height:'+z+'px;border-radius:50%;object-fit:cover;flex:none">':'<span class="ph" style="width:'+z+'px;height:'+z+'px;border-radius:'+(z/2)+'px">写真</span>';
+const HELP={"c-home": ["バナー・お知らせは押すと詳しく見られます", "体験動画・グラビアを見ると＋1J（1日10回まで）", "新人情報は横にスライド。タイトル横の「1か月の新人」で一覧が見られます", "「店舗から探す」や名前検索で、女性の一覧を開けます"], "c-gacha":["1日1回、無料で回せます","Jコインでも回せます（1回のJは管理画面で変更）","当たったチケットはJコイン画面の「持ち物」に入ります","下の表で、景品ごとの当たる確率を確認できます"],"a-gacha":["景品の名前・種類・確率・月の上限を自由に変えられます","確率は比率で計算します（合計が100%でなくても動きます）","月の上限に達した景品は、自動で出なくなります","変えたら「保存する」を押してください"],"c-media":["過去の体験動画・グラビアの一覧です","上のボタンで「体験動画」「グラビア」に絞り込めます","見ると＋1J（1日10回まで）"],"c-newbies":["この1か月に入店した新人の一覧です","「熟女家」「PLUS」で絞り込めます","写真を押すと大きく見られます"],"c-girls": ["「並べ替え・条件」で年齢順やホテルデリOKなどに絞り込めます", "気になる女性に「お気に入り申請」→ 店舗の確認 → 女性の承認でJ chatが使えます", "「店舗のサイトを見る」で各店舗の公式ページを開きます"], "c-talk": ["やり取り中の女性は「トーク」から開きます", "送信は1通10Jです", "電話番号・LINE・店外のお誘いは送れません（自動で止まります）"], "c-reviews": ["口コミを読むには1件20J使います（一度開けばいつでも読めます）", "ご利用後に「口コミを書く」→ 店舗が確認して公開されると＋30J", "店舗名で絞り込めます"], "c-board": ["上のカテゴリで絞り込めます", "下の欄から書き込めます", "ルール違反の書き込みは「通報」してください。「公式」はスタッフの投稿です"], "c-coin": ["「貯める」で貯め方を確認できます", "「使う」から交換・申請します", "Jコインは購入・換金できません"], "g-home": ["一番上のお知らせを押すと、過去のお知らせも見られます", "「写メ日記を書く」から日記を投稿できます", "お気に入り申請・未返信のメッセージの件数を押すと、メッセージ画面が開きます"], "g-notice": ["店舗からのお知らせの一覧です", "右上の「ホームへ」で戻ります"], "g-shift": ["月を選んで、希望日と時間を追加します", "「店舗に提出」で送信（月の初回は＋30pt）", "LINEで送る用に文章をコピーすることもできます", "曜日ごとの出勤人数の目安（少なめ・ふつう・多め）も見られます"], "g-diary": ["写真・タイトル・本文を入れて投稿します", "投稿はポータルサイトへ自動で送られます", "内容によっては店舗が後から削除することがあります"], "g-memo": ["「追加」でお客様のメモを作ります（＋3pt、1日5件まで）", "好みや注意事項などを書いておけます", "見られるのは本人と店舗だけです"], "g-talk": ["お気に入り申請は「承認」か「お断り」を選びます（店舗の確認済みのものだけ届きます）", "お客様のメッセージに返信できます（電話番号は表示されません）", "困ったときは「店舗に通報」、休みたいときは「お休みにする」"], "g-points": ["貯め方と今日の回数を確認できます", "交換所で特典を選ぶと、店舗に申請が届きます", "受け渡しは店舗で行います"], "a-dash": ["お客様会員・女性・トーク・承認待ちの件数をまとめて見られます", "会員一覧から書き込み停止の切り替えもできます"], "a-stats": ["登録数・ホーム画面追加率・画面ごとのアクセス数を見られます", "本番ではFirebase Analyticsの実データになります"], "a-roster": ["給与一覧のExcelを取り込むと、担当者コードと源氏名だけを登録します", "「プロフィール」で写真（横390×縦520px）・年齢・身長などを設定します", "「トーク停止」「退店にする」で利用を止められます"], "a-talk": ["お気に入り申請は店舗が確認して「女性へ回す」か「お断り」を選びます（ここだけ電話番号を全部表示）", "ご利用後は「受付でJ chatを開通する」から開通できます", "一覧から内容の確認・停止ができます"], "a-news": ["お知らせ・バナーを投稿すると、お客様ページにすぐ出ます", "不要になったものは削除できます"], "a-newbie": ["新人情報は写真（横390×縦520px）を付けて投稿します", "担当者コードを入れると名簿にも同時に登録されます", "体験動画・グラビアを登録すると、お客様ページにNEW表示されます"], "a-grant": ["電話番号・枚数・理由を入れてJコインを付与します", "付与は店舗名と一緒に履歴に残ります"], "a-review": ["「承認」で口コミが公開され、投稿したお客様に＋30J", "内容に問題があるものは「非公開」にします"], "a-board": ["スタッフとして「公式」投稿ができます", "通報された投稿を非表示・戻すことができます", "悪質な会員は書き込みを停止できます"], "a-req": ["お客様からのアポロのポイント交換申請です", "アポロに手入力したら「反映済み」、差し戻すとJコインがお客様に戻ります"], "a-gnotice": ["女性のマイページにお知らせを配信します（自店舗だけ／全店舗）"], "a-gshift": ["女性から提出されたシフト希望を確認できます", "シフトの確定は今どおりアポロで行います"], "a-gdiary": ["女性が投稿した写メ日記を確認し、問題があれば削除します"], "a-gmemo": ["女性が書いた顧客メモを確認できます"], "a-gpoint": ["週間ミッションの内容・回数・ポイントを設定します", "女性からの交換申請の受け渡し、特別付与、月間ランキングを確認できます"]};
+
+Object.assign(HELP,{"c-jshorts":["見たいジャンルを選ぶと縦動画が始まります","上下にスワイプで次の動画へ。左下の名前から女性のプロフィールを開けます","しばらく見ると＋10J（同じ動画は1日1回・1日の上限あり）"]});
+Object.assign(HELP,{"a-banner":["画像を選ぶと画像のバナー、選ばないと文字のバナーになります","リンク先URLを入れると、押したときに「詳しく見る」ボタンが出ます","一覧の↑↓で表示する順番、「非表示にする」で一時的に隠せます"],"a-news":["店舗ごとのお知らせを投稿します","お客様のホームに過去2か月分が表示されます","バナーは左のメニューの「バナー」から追加します"]});
+Object.assign(HELP,{
+ "c-home":["バナー・お知らせは押すと詳しく見られます","体験動画・グラビアを見ると＋10J、熟フェチ図鑑を見ると＋10J（どちらも1日の上限あり）","熟フェチ図鑑のボタンからジャンルを選ぶと縦動画が始まります。上下にスワイプで次の動画へ","「店舗から探す」や名前検索で、女性の一覧を開けます"],
+ "c-talk":["やり取り中の女性は「トーク」から開きます","1通1J・1日10通まで。女性から返信が届くと次を送れます","名前の横の「相性○%」は、登録した好みとの合い具合です","電話番号・LINE・店外のお誘いは送れません（自動で止まります）"],
+ "c-girls":["「並べ替え・条件」で相性の高い順・年齢順などに並べ替えられます","気になる女性に「お気に入り申請」→ 女性が承認するとJ chatが使えます","写真を押すとプロフィールが開きます"],
+ "c-reviews":["☆の総合点は誰でも見られます","5つの項目の点数と感想は、1件10Jで見られます（一度開けばいつでも見られます）","ご利用後に「口コミを書く」→ 店舗が確認して公開されると＋100J"],
+ "c-media":["過去の体験動画・グラビアの一覧です","上のボタンで「体験動画」「グラビア」に絞り込めます","見ると＋10J（1日10回まで）"],
+ "c-prefs":["登録した好みを変えられます","好みは「相性○%」の計算に使われます","変えたら一番下の「保存する」を押してください"],
+ "g-home":["一番上のお知らせを押すと、過去のお知らせも見られます","その下の「コラム」で、AI講座などの記事が読めます","お気に入り申請・未返信のメッセージの件数を押すと、メッセージ画面が開きます"],
+ "g-talk":["お気に入り申請は「相互お気に入りにする」か「お断り」を選びます","お客様のメッセージに返信できます（電話番号は表示されません）","困ったときは「店舗に通報」や「ブロック」。休みたいときは「お休みにする」"],
+ "g-timer":["コースを選んで「スタート」を押します","終わる前（5・10・15分前）と終了時に、音とバイブでお知らせします","延長のときは「＋10分」を押します"],
+ "a-talk":["自動マッチングの使う・使わない、つなぐ人数を変えられます","女性の承認待ちの申請を、店舗が「相互お気に入り」にすることもできます","一覧からトークを選ぶと内容を確認でき、停止もできます"],
+ "a-dash":["お客様会員・女性・トーク・承認待ちの件数をまとめて見られます","会員一覧の「利用を制限」で、問題のあるお客様のJ chat・申請・口コミ投稿を止められます"],
+ "a-juku":["店舗・女性・ジャンルを選んで、縦動画や音声を投稿します","もらえるJ・1日の上限・何秒見たらもらえるかを変えられます","投稿の停止・削除は一覧から。退店した女性の動画は自動で消えます"],
+ "a-gcolumn":["女性向けのコラム（AI講座など）を書いて公開します","女性のマイページのお知らせの下に表示されます","不要になったら一覧から削除できます"]
+});
+const PW=390,PH=520;
+const BW=840,BH=372;
+const bnSrc=p=>typeof phSrc==='function'?phSrc(p):p;
+function toBanner(f,cb){if(!f||!/^image\//.test(f.type))return;const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const sc=Math.max(BW/img.width,BH/img.height),w=img.width*sc,h=img.height*sc,cv=document.createElement('canvas');cv.width=BW;cv.height=BH;cv.getContext('2d').drawImage(img,(BW-w)/2,(BH-h)/2,w,h);URL.revokeObjectURL(url);cb(cv.toDataURL('image/jpeg',.8))};img.src=url}
+function toPhoto(f,cb){if(!f||!/^image\//.test(f.type))return;const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const sc=Math.max(PW/img.width,PH/img.height),w=img.width*sc,h=img.height*sc,cv=document.createElement('canvas');cv.width=PW;cv.height=PH;cv.getContext('2d').drawImage(img,(PW-w)/2,(PH-h)/2,w,h);URL.revokeObjectURL(url);cb(cv.toDataURL('image/jpeg',.82))};img.src=url}
+const nbPhoto=n=>n.photo||((S.comps.find(c=>(n.code&&c.code===n.code)||c.name===n.name)||{}).photo)||null;
+const rectPh=(src,w,alt)=>(src=phSrc(src))?'<img src="'+src+'" alt="'+esc(alt||'')+'" style="width:'+w+'px;height:'+Math.round(w*4/3)+'px;object-fit:cover;border-radius:10px;flex:none">':'<span class="ph" style="width:'+w+'px;height:'+Math.round(w*4/3)+'px;border-radius:10px">写真</span>';
+const helpBox=k=>{const h=HELP[k];if(!h)return '';const op=(S.ui.help||{})[k];return '<div class="howto"><button type="button" class="howto-b" data-act="help" data-v="'+k+'" aria-expanded="'+!!op+'"><span class="q">?</span>このページの使い方<span class="ar">'+(op?'▲':'▼')+'</span></button>'+(op?'<ul>'+h.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')+'</div>'};
+const prof=c=>[c.age?c.age+'歳':'',c.height?'T'+c.height:'',c.cup?c.cup+'カップ':''].filter(Boolean).join('・');
+const tags=c=>FLTS.filter(([k])=>c[k]).map(([,l])=>'<span class="chip chip-ok">'+l+'</span>').join(' ');
+function searchSheet(){
+  const f=S.ui.flt||{}, s=S.ui.sort, n=searchList().length;
+  const b=(act,v,l,on,full)=>'<button type="button" class="sbtn'+(full?' full':'')+'" data-act="'+act+'" data-v="'+v+'" aria-pressed="'+!!on+'">'+l+'</button>';
+  sheet('<div class="sec-h"><h3>女性を探す</h3>'+closeBtn+'</div><span class="flabel">店舗</span><div class="field"><label for="ss" class="sr">店舗</label><select class="input" id="ss" data-ch="s-store"><option value="">全店舗</option>'+STORES.map(x=>'<option'+(S.ui.sStore===x?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div><span class="flabel">並べ替え</span><div class="sgrid">'+SORTS.map(([v,l],i)=>b('sort',v,l,s===v,i===6)).join('')+'</div>'+
+    '<span class="flabel">絞り込み（複数選べます）</span><div class="sgrid">'+FLTS.map(([v,l])=>b('flt',v,l,f[v],true)).join('')+b('search-reset','','リセット',false,true)+'</div>'+
+    '<button type="button" class="btn btn-primary" data-act="sheet-cancel">'+n+'人を表示する</button>');
+}
+
+/* ===== お客様 ===== */
+function renderCustomer(){
+  const u=me();
+  if(!u) return '<div class="phone"><div class="c-head"><span class="logo">[グループロゴ]</span></div>'+cLogin()+'</div>';
+  if(!u.attr) return '<div class="phone"><div class="c-head"><span class="logo">[グループロゴ]</span></div><main class="c-body">'+cOnboard(false)+'</main></div>';
+  if(CFEAT[S.ui.tab]===false)S.ui.tab='home';
+  const t=S.ui.tab; let body={home:cHome,talk:cTalk,reviews:cReviews,board:cBoard,coin:cCoin}[t]();
+  if(!(t==='talk'&&S.ui.chatWith))body=helpBox('c-'+(t==='home'&&S.ui.hv?S.ui.hv:t))+body;
+  const unread=S.rooms.filter(r=>r.phone===u.phone&&r.status==='open'&&r.msgs.length&&r.msgs[r.msgs.length-1].from==='g'&&!r.uRead).length;
+  return '<div class="phone"><header class="c-head"><span class="logo">[グループロゴ]</span><button type="button" class="balance" data-act="tab" data-v="coin" aria-label="Jコイン残高 '+u.coins+'枚"><span class="jmark">J</span><span class="num">'+yen(u.coins)+'</span></button></header>'+
+   '<main class="c-body">'+body+'</main>'+nav([['home','ホーム','home'],['talk','J chat','talk',unread],['reviews','口コミ','review'],['board','掲示板','board'],['coin','Jコイン','coin']].filter(x=>CFEAT[x[0]]!==false),t,'tab')+'</div>';
+}
+function cLogin(){
+  if(S.ui.loginStep==='phone') return '<form class="login" data-form="login-phone"><h1>ログイン</h1><p class="muted small" style="margin:0">電話番号でログインします。はじめての方も登録できます。</p><div class="field"><label for="lp">電話番号（ハイフンなし）</label><input class="input num" id="lp" name="phone" inputmode="numeric" placeholder="09012345678"></div><p class="err" id="lp-err"></p><button class="btn btn-primary" type="submit">認証コードを送信</button><p class="hint">テスト用の番号：09000000001（常連A）・09000000002（Bさん）・09000000003（新規登録用）</p></form>';
+  const isNew=!S.users[S.ui.pendingPhone];
+  return '<form class="login" data-form="login-code"><h1>認証コードを入力</h1><p class="muted small" style="margin:0">'+esc(mask(S.ui.pendingPhone))+' にSMSで6桁のコードを送りました。</p><div class="field"><label for="lc">認証コード</label><input class="input num" id="lc" name="code" inputmode="numeric" maxlength="6" placeholder="123456"></div>'+
+   (isNew?'<div class="field"><label for="ln">ニックネーム</label><input class="input" id="ln" name="nick" maxlength="12"></div>':'')+
+   '<p class="err" id="lc-err"></p><button class="btn btn-primary" type="submit">'+(isNew?'登録してはじめる（＋'+R.FIRST+'J）':'ログイン')+'</button><button class="btn btn-ghost" type="button" data-act="login-back">番号を変更</button><p class="hint">テスト用の番号の認証コードは 123456 です（SMSは送られません）。</p></form>';
+}
+const mediaRow=m=>'<button type="button" class="row-btn" data-act="open-media" data-v="'+m.id+'"><span class="ph" style="width:50px;height:50px">'+(m.type==='体験動画'?'動画':'写真')+'</span><span style="display:flex;flex-direction:column;min-width:0"><span class="small muted">'+esc(m.type)+'・'+md(m.t)+' '+(Date.now()-m.t<2*day?'<span class="chip chip-new">NEW</span>':'')+'</span><span style="font-weight:500">'+esc(m.name)+'（'+esc(m.store)+'）</span></span></button>';
+const nbCard=n=>'<button type="button" class="newbie" data-act="open-newbie" data-v="'+n.id+'">'+rectPh(nbPhoto(n),120,n.name+'の写真')+'<b>'+esc(n.name)+'</b><span class="small muted">'+esc(n.store)+'・'+md(n.t)+'入店</span></button>';
+const subHead=(t,c)=>'<div style="display:flex;align-items:center;gap:8px"><button type="button" class="btn btn-ghost btn-sm" data-act="girls-back">‹ ホーム</button></div><div class="sec-h"><h1 class="pg-h">'+t+'</h1><span class="small muted num">'+c+'</span></div>';
+function cMediaList(){const f=S.ui.mf||'all';const l=S.media.filter(m=>f==='all'||m.type===f).sort((a,b)=>b.t-a.t);
+  return subHead('体験動画・グラビア',l.length+'件')+'<div class="seg seg-sm" role="group" aria-label="種類" style="align-self:flex-start">'+[['all','すべて'],['体験動画','体験動画'],['グラビア','グラビア']].map(([k,lb])=>'<button type="button" data-act="mf" data-v="'+k+'" aria-pressed="'+(f===k)+'">'+lb+'</button>').join('')+'</div><p class="small muted" style="margin:0">見ると＋'+R.VIEW+'J（1日'+R.VIEW_CAP+'回まで）</p><div class="card list">'+(l.map(mediaRow).join('')||'<div class="empty">まだありません</div>')+'</div>'}
+function cNewbies(){const g=S.ui.nbg||'all',now=Date.now();const l=S.newbies.filter(n=>n.t>=now-30*day&&(g==='all'||n.store.startsWith(g+' '))).sort((a,b)=>b.t-a.t);
+  const weeks=[['今週',0,7],['先週',7,14],['2週間前',14,21],['3〜4週間前',21,31]];
+  const tile=n=>{const src=typeof phSrc==='function'?phSrc(nbPhoto(n)):nbPhoto(n);return '<button type="button" class="nb-tile" data-act="open-newbie" data-v="'+n.id+'">'+(src?'<img src="'+src+'" alt="'+esc(n.name)+'の写真">':'<span class="ph">写真</span>')+'<b>'+esc(n.name)+'</b><span>'+esc(n.store)+'</span><span>'+md(n.t)+'入店</span></button>'};
+  return subHead('1か月の新人',l.length+'人')+'<div class="seg seg-sm" role="group" aria-label="グループ" style="align-self:flex-start">'+[['all','すべて'],['熟女家','熟女家'],['PLUS','PLUS']].map(([k,lb])=>'<button type="button" data-act="nbg" data-v="'+k+'" aria-pressed="'+(g===k)+'">'+lb+'</button>').join('')+'</div>'+
+   (l.length?weeks.map(([w,a,b])=>{const x=l.filter(n=>now-n.t>=a*day&&now-n.t<b*day);return x.length?'<section class="sec"><div class="sec-h"><h2 style="font-size:15px">'+w+'</h2><span class="small muted num">'+x.length+'人</span></div><div class="nb-grid">'+x.map(tile).join('')+'</div></section>':''}).join(''):'<div class="card empty">この1か月の新人はいません</div>');
+}
+function cHome(){
+  if(S.ui.hv==='girls')return cGirls();
+  if(S.ui.hv==='media')return cMediaList();
+  if(S.ui.hv==='gacha')return cGacha();
+  if(S.ui.hv==='prefs')return cOnboard(true);
+  if(S.ui.hv==='jshorts')return cJShorts();
+  if(S.ui.hv==='newbies')return cNewbies();
+  const ban=S.banners.filter(b=>!b.off).map(b=>b.photo?'<button type="button" class="banner has-img" data-act="open-banner" data-v="'+b.id+'" aria-label="'+esc(b.title)+'"><img src="'+bnSrc(b.photo)+'" alt=""></button>':'<button type="button" class="banner b-'+b.color+'" data-act="open-banner" data-v="'+b.id+'"><span class="lab">'+esc(b.label)+'</span><span class="tt">'+esc(b.title)+'</span></button>').join('')||'<div class="empty">バナーはまだありません</div>';
+  const news=S.news.filter(n=>n.t>=Date.now()-60*day).sort((a,b)=>b.t-a.t).map(n=>'<button type="button" class="row-btn" data-act="open-news" data-v="'+n.id+'"><span style="display:flex;flex-direction:column;min-width:0"><span class="small muted">'+md(n.t)+'・'+esc(n.store)+' '+(Date.now()-n.t<2*day?'<span class="chip chip-new">NEW</span>':'')+'</span><span style="font-weight:500">'+esc(n.title)+'</span></span></button>').join('')||'<div class="empty">お知らせはまだありません</div>';
+  const media=S.media.slice().sort((a,b)=>b.t-a.t).slice(0,3).map(mediaRow).join('')||'<div class="empty">更新はまだありません</div>';
+  const nbAll=S.newbies.filter(n=>n.t>=Date.now()-30*day).sort((a,b)=>b.t-a.t);const nb=nbAll.slice(0,10).map(nbCard).join('')+(nbAll.length>10?'<button type="button" class="newbie nb-more" data-act="hv" data-v="newbies"><span class="nb-more-in">すべて見る<b class="num">'+nbAll.length+'人</b></span></button>':'')||'<div class="empty">新人情報はまだありません</div>';
+  return '<section class="sec" aria-label="バナー"><div class="hscroll">'+ban+'</div></section>'+
+   '<section class="sec"><div class="sec-h"><h2>お知らせ</h2><span class="small muted">過去2か月分</span></div><div class="card list news-scroll" tabindex="0" role="region" aria-label="お知らせ（過去2か月分・上下にスクロール）">'+news+'</div></section>'+
+   cGachaHero()+
+   '<section class="sec"><div class="sec-h"><h2>公式YouTube</h2></div><a class="yt" href="https://www.youtube.com/" target="_blank" rel="noopener" data-act="yt"><span class="play"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span><span class="cap">[統合チャンネルの最新動画]</span></a></section>'+
+   '<section class="sec"><div class="sec-h"><h2>体験動画・グラビア</h2><button type="button" class="linkbtn" data-act="hv" data-v="media">過去の一覧 ›</button></div><div class="card list">'+media+'</div></section>'+
+   '<section class="sec"><div class="sec-h"><h2>新人情報</h2><button type="button" class="linkbtn" data-act="hv" data-v="newbies">1か月の新人（'+nbAll.length+'人）›</button></div><div class="hscroll">'+nb+'</div></section>'+
+   cJukuSec()+
+   cStores()+cFind()+
+   '<section class="sec"><div class="sec-h"><h2>毎月のイベント</h2></div><div class="ev-grid"><div class="card" style="padding:12px;border-top:4px solid var(--navy)"><span class="small muted">熟女家</span><br><b style="font-family:var(--font-display)">熟女の日</b><br><span class="small">毎月[〇]日・[特典内容]</span></div><div class="card" style="padding:12px;border-top:4px solid var(--orange)"><span class="small muted">PLUS</span><br><b style="font-family:var(--font-display)">PLUSの日</b><br><span class="small">毎月[〇]日・[特典内容]</span></div></div></section>';
+}
+function cStores(){
+  const grp=S.ui.stGrp||'熟女家';
+  const tile=st=>{const n=activeComps().filter(c=>c.store===st).length;return '<button type="button" class="st-tile" data-act="store-girls" data-v="'+esc(st)+'"><b>'+esc(st.replace(grp+' ','').replace(/店$/,'')).replace('・','・<wbr>')+'</b><span>'+n+'人</span></button>'};
+  return '<section class="sec"><div class="sec-h"><h2>店舗から探す</h2><div class="seg seg-sm" role="group" aria-label="グループ">'+['熟女家','PLUS'].map(x=>'<button type="button" data-act="st-grp" data-v="'+x+'" aria-pressed="'+(grp===x)+'">'+x+'</button>').join('')+'</div></div>'+
+   '<div class="st-grid">'+STORES.filter(x=>x.startsWith(grp+' ')).map(tile).join('')+'</div></section>';
+}
+function cFind(){
+  return '<section class="sec"><form class="findbar" data-form="home-search" role="search"><label for="hq" class="sr">名前で女性を探す</label><span class="fi">'+svg('search')+'</span><input class="input" id="hq" name="q" maxlength="12" placeholder="名前で女性を探す" value="'+esc(S.ui.q||'')+'"><button class="btn btn-primary btn-sm" type="submit">検索</button><button type="button" class="btn btn-ghost btn-sm" data-act="home-cond">条件</button></form></section>';
+}
+function girlRows(found,u){return found.map(g=>{const r=room(u.phone,g.code);let right;
+    if(r&&r.status==='open'){const last=r.msgs[r.msgs.length-1];right=(last&&last.from==='g'&&!r.uRead?'<span class="chip chip-new">新着</span>':'')+'<button type="button" class="btn btn-primary btn-sm" data-act="open-chat" data-v="'+g.code+'">トーク</button>'}
+    else if(r&&pend(r))right='<span class="chip chip-wait">女性の承認待ち</span>';
+    else if(r&&r.status==='stopped')right='<span class="chip chip-ng">利用停止中</span>';
+    else if(r&&r.status==='blocked')right='<span class="small muted">申請できません</span>';
+    else if(!talkAvail(g))right='<span class="small muted">トーク受付なし</span>';
+    else right='<button type="button" class="btn btn-ghost btn-sm" data-act="fav" data-v="'+g.code+'">♡ お気に入り申請</button>';
+    const ms=matchScore(u,g);
+    return '<div class="kv"><span style="display:flex;gap:10px;align-items:center;min-width:0"><button type="button" data-act="girl-sheet" data-v="'+esc(g.code)+'" style="border:0;background:none;padding:0;border-radius:50%" aria-label="'+esc(g.name)+'のプロフィール">'+av(g,40)+'</button><span style="display:flex;flex-direction:column;min-width:0;gap:2px"><b>'+esc(g.name)+' <span class="small muted" style="font-weight:400">'+esc(prof(g))+'</span>'+(ms!=null?' <span class="chip chip-match">相性 '+ms+'%</span>':'')+'</b><span class="small muted">'+esc(g.store)+'</span>'+(tags(g)?'<span style="display:flex;gap:4px;flex-wrap:wrap">'+tags(g)+'</span>':'')+'</span></span><span style="display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end">'+profLink(g)+right+'</span></div>'}).join('')||'<div class="empty">条件に合う女性がいません。条件を変えるか「リセット」してください。</div>';}
+function cGirls(){
+  const u=me(), found=searchList(), st=S.ui.sStore, top=st&&STORE_TOP(st);
+  const cond=[S.ui.q?'「'+S.ui.q+'」':'',(SORTS.find(x=>x[0]===S.ui.sort)||[])[1]].concat(FLTS.filter(([k])=>(S.ui.flt||{})[k]).map(x=>x[1])).filter(Boolean);
+  return '<div style="display:flex;align-items:center;gap:8px"><button type="button" class="btn btn-ghost btn-sm" data-act="girls-back">‹ ホーム</button></div>'+
+   '<div class="sec-h"><h1 class="pg-h">'+esc(st||'女性を探す')+'</h1><span class="small muted num">'+found.length+'人</span></div>'+
+   (top?'<a class="linkbtn" style="align-self:flex-start" href="'+esc(top)+'" target="_blank" rel="noopener">店舗のサイトを見る ›</a>':'')+
+   '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button type="button" class="btn btn-ghost btn-sm" data-act="search">'+svg('search')+' 並べ替え・条件</button>'+cond.map(c=>'<span class="chip chip-wait">'+esc(c)+'</span>').join('')+(cond.length?'<button type="button" class="linkbtn" data-act="girls-reset">条件をリセット</button>':'')+'</div>'+
+   '<p class="small muted" style="margin:0">気になる女性に「お気に入り申請」して、女性が承認するとJ chatでやり取りできます。</p>'+
+   '<div class="card list">'+girlRows(found,u)+'</div>';
+}
+function cTalk(){
+  const u=me();
+  if(S.ui.chatWith){
+    const g=comp(S.ui.chatWith), r=room(u.phone,g.code);
+    if(!r||pend(r)||r.status==='blocked'){S.ui.chatWith=null;return cTalk()}
+    r.uRead=true;
+    const list=r.msgs.map(m=>'<div class="bw '+(m.from==='u'?'me':'them')+'"><div class="bubble">'+esc(m.text)+'</div><span class="small muted">'+md(m.t)+' '+hm(m.t)+(m.from==='u'?'・<span class="coin">−'+R.MSG+'J</span>':'')+'</span></div>').join('')||'<div class="empty">まだメッセージはありません。最初のひとことを送ってみましょう。</div>';
+    const stopped=r.status==='stopped'||!g.active, paused=!talkAvail(g);
+    return '<div style="display:flex;align-items:center;gap:10px"><button type="button" class="btn btn-ghost btn-sm" data-act="chat-back">‹ 一覧</button>'+av(g,40)+'<span style="display:flex;flex-direction:column"><b>'+esc(g.name)+'</b><span class="small muted">'+esc(g.store)+'</span></span></div>'+
+     '<div class="chat">'+list+'</div><p class="note">店舗がやり取りを確認しています。連絡先の交換・店外のお誘いは禁止です。1通 '+R.MSG+'J・1日'+R.MSG_DAY+'通まで。女性の返信が届くと次を送れます。</p>'+
+     (stopped?'<p class="note" style="color:var(--danger)">現在このトークは利用できません。</p>':paused?'<p class="note">現在、'+esc(g.name)+'さんはJ chatをお休みしています。再開までお待ちください。</p>':chatBlock(u,r)?'<p class="note" style="background:var(--surface);border-radius:10px;padding:10px 12px">'+esc(chatBlock(u,r))+'</p>':'<form class="composer" data-form="u-msg"><label for="cm" class="sr">メッセージ</label><input class="input" id="cm" name="text" maxlength="200" placeholder="メッセージ（1通 '+R.MSG+'J）" autocomplete="off"><button class="btn btn-orange" type="submit">送信</button></form><p class="err" id="cm-err"></p>');
+  }
+  const found=searchList();
+  const cond=[S.ui.sStore,S.ui.q?'「'+S.ui.q+'」':'',(SORTS.find(x=>x[0]===S.ui.sort)||[])[1]].concat(FLTS.filter(([k])=>(S.ui.flt||{})[k]).map(x=>x[1])).filter(Boolean);
+  const rows=girlRows(found,u);
+  const mine=S.rooms.filter(r=>r.phone===u.phone&&r.status==='open').length;
+  return '<div class="sec-h"><h1 class="pg-h">J chat</h1><span class="small muted">1通 <span class="coin">'+R.MSG+'J</span>・1日'+R.MSG_DAY+'通まで</span></div>'+
+   '<p class="note">J chatは ①お気に入り申請 → 女性が承認、②好みに合う女性と自動でつながる、③店舗が相互お気に入りにする、のどれかで始まります。いまトークできる女性：<b>'+mine+'人</b></p>'+
+   '<button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-start" data-act="hv-prefs">好みの設定を変える</button>'+
+   '<div class="sec-h"><button type="button" class="btn btn-ghost btn-sm" data-act="search">'+svg('search')+' 女性を探す</button><span class="small muted num">'+found.length+'人</span></div>'+
+   (cond.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+cond.map(c=>'<span class="chip chip-wait">'+esc(c)+'</span>').join('')+'<button type="button" class="linkbtn" data-act="search-reset">条件をリセット</button></div>':'')+
+   '<div class="card list">'+rows+'</div>';
+}
+function cReviews(){
+  const u=me(), f=S.ui.rvFilter;
+  const items=(r,open)=>'<div class="rv-items'+(open?'':' locked')+'" aria-hidden="'+!open+'">'+RV_ITEMS.map((l,i)=>{const v=open?rvSc(r)[i]:3;return '<span>'+l+'</span><span class="rv-bar"><i style="width:'+(v/5*100)+'%"></i></span><b class="num">'+(open?v:'?')+'</b>'}).join('')+'</div>';
+  const list=S.reviews.filter(r=>r.status==='ok').filter(r=>f==='all'||comp(r.girl).store.startsWith(f)).sort((a,b)=>b.t-a.t).map(r=>{const g=comp(r.girl),open=rvOpen(u,r),avg=rvAvg(r);
+    return '<article class="card post"><div class="sec-h"><span><b>'+esc(g.name)+'</b> <span class="small muted">'+esc(g.store)+'</span></span><span class="rv-head">'+stars(avg)+'<b class="rv-score">'+avg.toFixed(1)+'</b></span></div>'+items(r,open)+
+     (open?'<p style="margin:0;font-size:13px;line-height:1.7">'+esc(r.text)+'</p><div class="sec-h small muted"><span>'+esc(r.nick)+'・'+md(r.t)+'</span><span style="color:var(--ok);font-weight:500">利用確認済み</span></div>':'<span class="skel"></span><span class="skel" style="width:75%"></span><button type="button" class="lockbtn" data-act="unlock" data-v="'+r.id+'">'+lockI+' '+R.READ+'Jで項目別の点数と感想を見る</button>')+'</article>'}).join('')||'<div class="card empty">公開中の口コミはまだありません</div>';
+  const pill=(v,l)=>'<button type="button" class="pill" data-act="rv-filter" data-v="'+v+'" aria-pressed="'+(f===v)+'">'+l+'</button>';
+  return '<div class="sec-h"><h1 class="pg-h">リアル口コミ</h1><button type="button" class="btn btn-primary btn-sm" data-act="write-review">口コミを書く</button></div><p class="note">総合点（☆）は誰でも見られます。5つの項目の点数と感想は <span class="coin">1件 '+R.READ+'J</span>。投稿すると <span class="coin">＋'+R.REVIEW+'J</span>（承認後）。</p><div class="pills">'+pill('all','すべて')+pill('熟女家','熟女家')+pill('PLUS','PLUS')+'</div>'+list;
+}
+function cBoard(){
+  const u=me(), f=S.ui.bdFilter;
+  const list=S.posts.filter(p=>!p.hidden).filter(p=>f==='all'||p.cat===f).sort((a,b)=>b.t-a.t).map(p=>'<article class="card post'+(p.official?' official':'')+'"><div class="sec-h small muted"><span><b style="color:var(--fg);font-size:13px">'+esc(p.nick)+'</b> '+(p.official?'<span class="chip chip-official">公式</span>':esc(p.cat))+'</span><span>'+md(p.t)+' '+hm(p.t)+'</span></div><p style="margin:0;font-size:14px;line-height:1.7;word-break:break-word">'+esc(p.text)+'</p>'+(!p.official&&p.phone!==u.phone?'<div style="display:flex;justify-content:flex-end"><button type="button" class="linkbtn" data-act="report-post" data-v="'+p.id+'">通報</button></div>':'')+'</article>').join('')||'<div class="card empty">まだ書き込みはありません</div>';
+  return '<h1 class="pg-h">交流掲示板</h1><button type="button" class="btn btn-sm" style="background:var(--orange-soft);color:var(--orange-ink);justify-content:space-between" data-act="rules">ご利用ルール（必ずお読みください）<span>›</span></button>'+
+   '<div class="pills">'+['すべて','公式','感想','ご意見','雑談'].map(c=>{const v=c==='すべて'?'all':c;return '<button type="button" class="pill" data-act="bd-filter" data-v="'+v+'" aria-pressed="'+(f===v)+'">'+c+'</button>'}).join('')+'</div>'+
+   (u.banned?'<p class="note" style="color:var(--danger)">ルール違反のため、現在書き込みが停止されています。</p>':'<form data-form="post" style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:8px"><label for="pc" class="sr">カテゴリ</label><select class="input" id="pc" name="cat" style="flex:none;width:104px"><option>感想</option><option>ご意見</option><option>雑談</option></select><label for="pt" class="sr">内容</label><input class="input" id="pt" name="text" maxlength="200" placeholder="書き込む…" autocomplete="off"></div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><p class="err" id="pt-err"></p><button class="btn btn-orange btn-sm" type="submit">書き込む</button></div></form>')+list;
+}
+function cCoin(){
+  const u=me(), vn=u.views.d===today()?u.views.n:0;
+  const hist=u.history.slice(0,8).map(h=>'<div class="kv"><span><span class="small muted">'+md(h.t)+'</span> '+esc(h.r)+'</span><b class="num" style="color:'+(h.v>0?'var(--gold-ink)':'var(--muted)')+'">'+(h.v>0?'＋':'−')+Math.abs(h.v)+'J</b></div>').join('')||'<div class="empty">履歴はまだありません</div>';
+  const items=u.items.map(i=>'<div class="kv"><span>'+esc(i.name)+'</span><span class="chip chip-wait">電話予約時に利用</span></div>').join('');
+  const reqs=S.requests.filter(r=>r.phone===u.phone).map(r=>'<div class="kv"><span>'+esc(r.type)+'（'+r.coins+'J）</span><span class="chip '+(r.status==='done'?'chip-ok':r.status==='back'?'chip-ng':'chip-wait')+'">'+(r.status==='done'?'反映済み':r.status==='back'?'差し戻し（返却済み）':'受付中')+'</span></div>').join('');
+  const use=(n,s,p,b,a,v)=>'<div class="card use"><b style="line-height:1.35">'+n+'</b><span class="small muted">'+s+'</span><div class="foot"><span class="coin num">'+p+'</span><button type="button" class="btn btn-orange btn-sm" data-act="'+a+'"'+(v?' data-v="'+v+'"':'')+'>'+b+'</button></div></div>';
+  return '<section class="bal-card"><div style="display:flex;flex-direction:column"><span class="small" style="color:#E9D39C;font-weight:700">Jコイン残高</span><span class="v num">'+yen(u.coins)+'<span style="font-size:15px"> J</span></span><span class="small" style="color:#C9D2DE">'+esc(u.nick)+' さん</span></div><button type="button" class="btn btn-sm" style="background:transparent;border:1px solid #E9D39C;color:#FBF1DC" data-act="logout">ログアウト</button></section>'+
+   '<section class="sec"><h2 style="font-size:17px;font-weight:900">貯める</h2><div class="card list"><div class="kv"><span>毎日ログイン</span><span><b class="coin">＋'+R.LOGIN+'J</b> '+(u.lastLogin===today()?'<span class="chip chip-ok">本日獲得済み</span>':'')+'</span></div><div class="kv"><span>体験動画・グラビアを見る</span><span><b class="coin">＋'+R.VIEW+'J</b> <span class="small muted num">本日 '+vn+'/'+R.VIEW_CAP+'</span></span></div><div class="kv"><span>熟フェチ図鑑を見る</span><span><b class="coin">＋'+S.juku.j+'J</b> <span class="small muted num">本日 '+jkToday(u).ids.length+'/'+S.juku.cap+'</span></span></div><div class="kv"><span>口コミ投稿（承認後）</span><b class="coin">＋'+R.REVIEW+'J</b></div><div class="kv"><span>ご利用（受付で付与）</span><b class="coin">＋[〇]J</b></div></div></section>'+
+   '<section class="sec"><h2 style="font-size:17px;font-weight:900">使う</h2><div class="g2">'+(S.gacha.on?use('ガチャ','1日'+S.gacha.free+'回は無料','1回 '+S.gacha.cost+'J','回す','go-gacha'):'')+use('1週間以上先の予約枠','予約チケット',R.RESERVE+'J','交換','buy-reserve')+use('J chat','女性へメッセージ','1通 '+R.MSG+'J','開く','tab','talk')+use('口コミを読む','リアルな感想','1件 '+R.READ+'J','開く','tab','reviews')+use('アポロのポイント','スタッフが反映',R.APOLLO+'J','申請','buy-apollo')+'</div></section>'+
+   (items||reqs?'<section class="sec"><h2 style="font-size:17px;font-weight:900">持ち物・申請</h2><div class="card list">'+items+reqs+'</div></section>':'')+
+   '<section class="sec"><h2 style="font-size:17px;font-weight:900">履歴</h2><div class="card list">'+hist+'</div></section><p class="small muted" style="margin:0">Jコインはこのページ内限定です。購入・換金はできません。</p>';
+}
+
+/* ===== コンパニオン ===== */
+function renderComp(){
+  const g=gme();
+  if(!g) return '<div class="phone comp"><div class="c-head"><span class="logo">コンパニオン マイページ</span></div><form class="login" data-form="g-login"><h1>ログイン</h1><div class="field"><label for="gid">担当者コード</label><input class="input num" id="gid" name="code" inputmode="numeric" placeholder="9001"></div><div class="field"><label for="gpw">パスワード</label><input class="input" id="gpw" name="pw" type="password" placeholder="9001"></div><p class="err" id="gid-err"></p><button class="btn btn-primary" type="submit">ログイン</button><p class="hint">デモ用：担当者コード 9001〜9004（パスワードは同じ番号）。管理画面の「女性の名簿」で取り込んだ女性も、同じルールでログインできます。</p></form></div>';
+  if(GFEAT[S.ui.gTab]===false)S.ui.gTab='home';
+  const t=S.ui.gTab;
+  let body={home:gHome,notice:gNotice,shift:gShift,diary:gDiary,memo:gMemo,talk:gTalk,points:gPoints,timer:gTimer}[t]();
+  if(!(t==='talk'&&S.ui.gThread))body=helpBox('g-'+t)+body;
+  const myRooms=S.rooms.filter(r=>r.code===g.code);
+  const badge=myRooms.filter(r=>r.status==='requested').length+myRooms.filter(r=>r.status==='open'&&r.msgs.length&&r.msgs[r.msgs.length-1].from==='u').length;
+  return '<div class="phone comp"><header class="c-head"><span class="logo">マイページ</span>'+(GFEAT.points?'<button type="button" class="balance" data-act="gtab" data-v="points" aria-label="Jポイント残高 '+(g.jp||0)+'pt"><span class="jmark" style="background:var(--wine)">P</span><span class="num">'+yen(g.jp||0)+'</span></button>':'')+'</header><main class="c-body">'+body+'</main>'+
+   nav([['home','ホーム','home'],['shift','シフト','shift'],['diary','写メ日記','diary'],['memo','顧客メモ','memo'],['talk','メッセージ','talk',badge],['timer','タイマー','timer']].filter(x=>GFEAT[x[0]]!==false),t,'gtab')+'</div>';
+}
+function gHome(){
+  const g=gme(), n=S.gNotices.filter(x=>x.store==='全店舗'||x.store===g.store).sort((a,b)=>b.t-a.t)[0];
+  const rs=S.rooms.filter(r=>r.code===g.code), req=rs.filter(r=>r.status==='requested').length, wait=rs.filter(r=>r.status==='open'&&r.msgs.length&&r.msgs[r.msgs.length-1].from==='u').length;
+  const rv=S.reviews.filter(r=>r.girl===g.code&&r.status==='ok').length;
+  return '<div class="sec-h"><h1 class="pg-h">こんにちは、'+esc(g.name)+'さん</h1><button class="linkbtn" data-act="g-logout">ログアウト</button></div>'+
+   (n?'<button type="button" class="card" style="text-align:left;padding:12px 14px;background:var(--wine-soft);border:0" data-act="gtab" data-v="notice"><span class="small muted">お店からのお知らせ・'+md(n.t)+'</span><br><b>'+esc(n.title)+'</b></button>':'<div class="card empty">お知らせはまだありません</div>')+
+   gColumns()+
+   (GFEAT.points?gMissions():'')+
+   '<div class="g2"><button type="button" class="card" style="text-align:left;padding:12px" data-act="gtab" data-v="talk"><span class="small muted">お気に入り申請</span><br><b class="num" style="font-size:22px">'+req+'件</b></button><button type="button" class="card" style="text-align:left;padding:12px" data-act="gtab" data-v="talk"><span class="small muted">未返信のメッセージ</span><br><b class="num" style="font-size:22px">'+wait+'件</b></button></div>'+
+   '<div class="g2"><button class="btn btn-primary" data-act="gtab" data-v="diary">写メ日記を書く</button><button class="btn btn-ghost" data-act="gtab" data-v="talk">メッセージ</button></div>'+
+   (siteUrl(g)?profLink(g,'サイトのマイプロフィールを見る'):'<p class="note">サイトのプロフィールとまだひも付いていません（店舗が設定します）。</p>');
+}
+function gNotice(){const g=gme(),ns=S.gNotices.filter(x=>x.store==='全店舗'||x.store===g.store).sort((a,b)=>b.t-a.t);
+  return '<div class="sec-h"><h1 class="pg-h">お知らせ</h1><button class="linkbtn" data-act="gtab" data-v="home">ホームへ</button></div>'+(ns.length?'<div class="card list">'+ns.map(n=>'<article style="padding:12px 14px"><div class="sec-h"><b>'+esc(n.title)+'</b><span class="small muted">'+md(n.t)+'</span></div><p style="margin:4px 0 0;white-space:pre-wrap">'+esc(n.body)+'</p></article>').join('')+'</div>':'<div class="card empty">お知らせはまだありません</div>')}
+const WD='日月火水木金土';
+const TIMES=(()=>{const a=[];for(let h=10;h<=29;h++)for(const m of [0,30]){if(h===29&&m)break;a.push(String(h).padStart(2,'0')+':'+(m?'30':'00'))}return a})();
+const tl=t=>{const h=+t.slice(0,2);return h>24||(h===24&&t.slice(3)!=='00')?'翌'+(h-24)+':'+t.slice(3):t};
+function months(){const d=new Date(),a=[];for(let i=0;i<2;i++){const x=new Date(d.getFullYear(),d.getMonth()+i,1);a.push(x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'))}return a}
+const mL=ym=>+ym.slice(5)+'月';
+const dL=ds=>{const d=new Date(ds+'T00:00:00');return (d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）'};
+function shiftDoc(code,ym){let s=S.shifts.find(x=>x.code===code&&x.ym===ym);if(!s){s={code,ym,entries:[],note:'',submitted:null};S.shifts.push(s)}return s}
+function shiftText(g,s){const l=s.entries.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>e.off?dL(e.date)+' お休み希望':dL(e.date)+' '+tl(e.start)+'〜'+tl(e.end)+e.endType);
+  return '【'+mL(s.ym)+' シフト希望】'+g.name+'（'+g.store+'）\n'+(l.join('\n')||'（希望日なし）')+(s.note?'\n備考：'+s.note:'')}
+function gShift(){
+  const g=gme(),ms=months(); if(!S.ui.ym||!ms.includes(S.ui.ym))S.ui.ym=ms[1];
+  const s=shiftDoc(g.code,S.ui.ym), [y,m]=S.ui.ym.split('-').map(Number), last=new Date(y,m,0).getDate();
+  const opt=sel=>TIMES.map(t=>'<option value="'+t+'"'+(t===sel?' selected':'')+'>'+tl(t)+'</option>').join('');
+  const text=shiftText(g,s);
+  return '<h1 class="pg-h">シフト希望</h1><p class="small muted" style="margin:0">入力して「LINEで送る」か「店舗に提出」。確定は今までどおりアポロで行います。</p>'+
+   '<div class="field"><label for="ym">対象の月</label><select class="input" id="ym">'+ms.map(x=>'<option value="'+x+'"'+(x===S.ui.ym?' selected':'')+'>'+x.slice(0,4)+'年'+mL(x)+'</option>').join('')+'</select></div>'+
+   weekCounts(g)+'<form class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px" data-form="shift-add"><div class="field"><label for="sd">日付</label><input class="input" id="sd" name="date" type="date" min="'+S.ui.ym+'-01" max="'+S.ui.ym+'-'+last+'"></div><div class="g2"><div class="field"><label for="ss">開始</label><select class="input" id="ss" name="start">'+opt('18:00')+'</select></div><div class="field"><label for="se">終了</label><select class="input" id="se" name="end">'+opt('24:00')+'</select></div></div>'+
+   '<div class="seg" role="group" aria-label="終了時刻の扱い" style="align-self:flex-start">'+['UP','受付'].map(k=>'<button type="button" data-act="endtype" data-v="'+k+'" aria-pressed="'+(S.ui.endType===k)+'">'+k+'</button>').join('')+'</div><span class="small muted">UP：この時間までに終わり／受付：この時間まで受付</span>'+
+   '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="off" style="width:20px;height:20px">この日はお休み希望</label><p class="err" id="sd-err"></p><button class="btn btn-ghost" type="submit">この日を追加</button></form>'+
+   (s.entries.length?'<div class="card list">'+s.entries.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>'<div class="kv"><span class="num">'+dL(e.date)+'　'+(e.off?'<span class="chip chip-wait">お休み希望</span>':tl(e.start)+'〜'+tl(e.end)+e.endType)+'</span><button class="linkbtn" data-act="shift-del" data-v="'+e.date+'">削除</button></div>').join('')+'</div>':'<div class="card empty">まだ希望日はありません</div>')+
+   '<div class="field"><label for="sn">備考</label><textarea class="input" id="sn" maxlength="200">'+esc(s.note)+'</textarea></div>'+
+   '<div class="card" style="padding:12px;background:var(--surface-2)"><span class="small" style="font-weight:700">LINEで送る内容</span><pre id="stext" style="margin:0;white-space:pre-wrap;font-family:inherit">'+esc(text)+'</pre></div>'+
+   (s.submitted?'<span class="chip chip-ok" style="align-self:flex-start">店舗に提出済み（'+md(s.submitted)+' '+hm(s.submitted)+'）</span>':'')+
+   '<div class="g2"><button class="btn btn-ghost" data-act="shift-submit">店舗に提出</button><button class="btn btn-ghost" data-act="shift-copy">文章をコピー</button></div><a class="btn btn-primary" id="sline" href="https://line.me/R/share?text='+encodeURIComponent(text)+'" target="_blank" rel="noopener">LINEで送る</a>';
+}
+function dStat(d){return d.status==='posted'?'<span class="chip chip-ok">投稿済み</span>':d.status==='deleted'?'<span class="chip chip-ng">店舗が削除</span>':'<span class="chip chip-wait">送信中</span>'}
+function gDiary(){const g=gme(),mine=S.diaries.filter(d=>d.code===g.code).sort((a,b)=>b.t-a.t);
+  return '<h1 class="pg-h">写メ日記</h1><form class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px" data-form="diary"><div class="field"><label for="dimg">写真</label><input class="input" id="dimg" type="file" accept="image/*"></div>'+(S.ui.img?'<img class="thumb" src="'+S.ui.img+'" alt="選んだ写真のプレビュー">':'')+
+   '<div class="field"><label for="dt">タイトル</label><input class="input" id="dt" name="title" maxlength="40"></div><div class="field"><label for="db">本文</label><textarea class="input" id="db" name="body" maxlength="500"></textarea></div>'+
+   '<div style="display:flex;gap:14px;flex-wrap:wrap"><span class="flabel">自動投稿するポータル</span>'+PORTALS.map((p,i)=>'<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="p'+i+'" checked style="width:20px;height:20px">'+p+'</label>').join('')+'</div><p class="err" id="dt-err"></p><button class="btn btn-primary" type="submit">投稿する</button></form>'+
+   '<h2 style="font-size:16px">投稿履歴</h2>'+(mine.length?'<div class="card list">'+mine.map(d=>'<div class="kv"><span><b>'+esc(d.title)+'</b><br><span class="small muted">'+md(d.t)+' '+hm(d.t)+'</span></span>'+dStat(d)+'</div>').join('')+'</div>':'<div class="card empty">まだ投稿はありません</div>')}
+function gMemo(){const g=gme(),mine=S.memos.filter(m=>m.code===g.code).sort((a,b)=>b.t-a.t),ed=S.ui.memoEdit,e=ed&&ed!=='new'?mine.find(m=>m.id===ed):null;
+  if(ed) return '<div class="sec-h"><h1 class="pg-h">'+(e?'顧客メモを編集':'顧客メモを追加')+'</h1><button class="linkbtn" data-act="memo-close">戻る</button></div><form class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px" data-form="memo" data-id="'+(e?e.id:'')+'"><div class="field"><label for="mn">お客様名（手入力）</label><input class="input" id="mn" name="name" maxlength="30" value="'+esc(e?e.name:'')+'"></div><div class="field"><label for="ml">好み</label><textarea class="input" id="ml" name="like">'+esc(e?e.like:'')+'</textarea></div><div class="field"><label for="mc">注意事項</label><textarea class="input" id="mc" name="care">'+esc(e?e.care:'')+'</textarea></div><p class="err" id="mn-err"></p><button class="btn btn-primary" type="submit">保存する</button>'+(e?'<button class="btn btn-danger" type="button" data-act="memo-del" data-v="'+e.id+'">このメモを削除</button>':'')+'</form>';
+  return '<div class="sec-h"><h1 class="pg-h">顧客メモ</h1><button class="btn btn-primary btn-sm" data-act="memo-new">追加</button></div><p class="small muted" style="margin:0">このメモは、あなたと店舗だけが見られます。</p>'+(mine.length?mine.map(m=>'<button type="button" class="card" style="text-align:left;padding:12px 14px" data-act="memo-open" data-v="'+m.id+'"><b>'+esc(m.name)+'</b>'+(m.like?'<br><span class="small">好み：'+esc(m.like)+'</span>':'')+(m.care?'<br><span class="small">注意：'+esc(m.care)+'</span>':'')+'</button>').join(''):'<div class="card empty">まだメモはありません</div>')}
+function gTalk(){
+  const g=gme(), rs=S.rooms.filter(r=>r.code===g.code);
+  if(S.ui.gThread){const r=rs.find(x=>x.id===S.ui.gThread); if(!r||pend(r)){S.ui.gThread=null;return gTalk()}
+    const u=S.users[r.phone]||{nick:'[退会済み]'}, stopped=r.status==='stopped';
+    return '<div class="sec-h"><h1 class="pg-h">'+esc(u.nick)+' さん</h1><button class="linkbtn" data-act="g-thread-close">一覧へ</button></div>'+
+     '<div class="chat">'+(r.msgs.map(m=>'<div class="bw '+(m.from==='g'?'me':'them')+'"><div class="bubble">'+esc(m.text)+'</div><span class="small muted">'+md(m.t)+' '+hm(m.t)+'</span></div>').join('')||'<div class="empty">まだメッセージはありません</div>')+'</div>'+
+     (stopped?'<p class="note" style="color:var(--danger)">このトークは店舗が停止中です。</p>':'<form class="composer" data-form="g-msg" data-id="'+r.id+'"><label for="gm" class="sr">メッセージ</label><input class="input" id="gm" name="text" maxlength="300" autocomplete="off" placeholder="返信する"><button class="btn btn-primary" type="submit">送信</button></form><p class="err" id="gm-err"></p>')+
+     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-danger btn-sm" data-act="g-report" data-v="'+r.id+'">店舗に通報</button><button class="btn btn-ghost btn-sm" data-act="g-block" data-v="'+r.id+'">このお客様をブロック</button></div><p class="note">ブロックすると、このお客様からのメッセージ・お気に入り申請が届かなくなります（お客様には「トークできません」とだけ表示されます）。</p>';}
+  const req=rs.filter(r=>r.status==='requested'), open=rs.filter(r=>!pend(r)&&r.status!=='blocked'), blk=rs.filter(r=>r.status==='blocked');
+  return '<h1 class="pg-h">メッセージ（J chat）</h1><p class="small muted" style="margin:0">お客様の電話番号は表示されません。連絡先の交換は自動で止まります。</p>'+
+   '<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:8px"><div class="kv" style="padding:0"><span style="display:flex;flex-direction:column"><b>J chatの受付</b><span class="small muted">'+(!g.talkOn?'店舗の設定で停止中です':g.selfOff?'お休み中：新しい申請とお客様からの送信が止まります':'受け付け中：お客様から申請・メッセージが届きます')+'</span></span>'+(g.talkOn?'<button type="button" class="btn '+(g.selfOff?'btn-primary':'btn-ghost')+' btn-sm" style="white-space:nowrap;flex:none" data-act="g-talk-toggle" aria-pressed="'+!g.selfOff+'">'+(g.selfOff?'受付を再開する':'お休みにする')+'</button>':'<span class="chip chip-ng">店舗が停止中</span>')+'</div></div>'+
+   '<h2 style="font-size:16px">お気に入り申請</h2>'+(req.length?'<div class="card list">'+req.map(r=>{const u=S.users[r.phone]||{nick:'?'};return '<div class="kv"><span><b>'+esc(u.nick)+'</b> さん<br><span class="small muted">'+md(r.t)+' に申請</span></span><span style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" data-act="g-approve" data-v="'+r.id+'">♡ 相互お気に入りにする</button><button class="btn btn-ghost btn-sm" data-act="g-decline" data-v="'+r.id+'">お断り</button></span></div>'}).join('')+'</div>':'<div class="card empty">新しい申請はありません</div>')+
+   '<h2 style="font-size:16px">やり取り中</h2>'+(open.length?'<div class="card list">'+open.map(r=>{const u=S.users[r.phone]||{nick:'?'},last=r.msgs[r.msgs.length-1];return '<button type="button" class="row-btn" data-act="g-thread" data-v="'+r.id+'"><span style="flex:1;min-width:0;display:flex;flex-direction:column"><b>'+esc(u.nick)+' さん '+(last&&last.from==='u'?'<span class="chip chip-wait">未返信</span>':'')+(r.status==='stopped'?'<span class="chip chip-ng">停止中</span>':'')+'</b><span class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(last?esc(last.text):(r.by==='staff'?'受付で開通しました':'承認しました'))+'</span></span></button>'}).join('')+'</div>':'<div class="card empty">まだトークはありません</div>')+
+   (blk.length?'<h2 style="font-size:16px">ブロック中</h2><div class="card list">'+blk.map(r=>{const u=S.users[r.phone]||{nick:'?'};return '<div class="kv"><span><b>'+esc(u.nick)+'</b> さん</span><button class="btn btn-ghost btn-sm" data-act="g-unblock" data-v="'+r.id+'">ブロックを解除</button></div>'}).join('')+'</div>':'');
+}
+
+
+/* ===== Jポイント（女性向け・お客様のJコインとは別の財布） ===== */
+const JP_RULES={diary:[10,3,'写メ日記を投稿','1日3回まで'],reply:[5,10,'J chatに24時間以内に返信','1日10回まで'],shift:[30,1,'シフト希望を締切までに提出','月1回'],memo:[3,5,'顧客メモを記入','1日5件まで'],login:[1,1,'ログインボーナス','1日1回']};
+const JP_ITEMS=[['drink','待機室のドリンク・お菓子',50],['goods','備品（コスメ・アメニティ）',150],['diarytop','写メ日記のトップ表示',200],['banner','新人速報・バナーへの掲載',300],['shiftpri','シフト希望の優先',300]];
+function jpAward(c,k){if(!GFEAT.points)return 0;c.dc=c.dc||{};{const dk=k+':'+today();c.dc[dk]=(c.dc[dk]||0)+1}c.jp=c.jp||0;c.jh=c.jh||[];c.jc=c.jc||{};const [v,cap,label]=JP_RULES[k];const key=k+':'+(k==='shift'?S.ui.ym:today());const n=c.jc[key]||0;if(n>=cap)return 0;c.jc[key]=n+1;c.jp+=v;c.jh.unshift({t:Date.now(),v,r:label});return v}
+/* ===== 週間ミッション（月曜はじまり。数・内容はミーティングで決定。管理画面で変更できる） ===== */
+const weekDays=()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return [...Array(7)].map((_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return x.getFullYear()+'-'+(x.getMonth()+1)+'-'+x.getDate()})};
+const weekEnd=()=>{const w=weekDays()[6].split('-');return w[1]+'/'+w[2]};
+const MS_KIND={login:['ログインする','日'],diary:['写メ日記を投稿','回'],reply:['J chatに返信（24時間以内）','回'],memo:['顧客メモを書く','件'],shift:['シフト希望を提出','回']};
+const msLabel=m=>MS_KIND[m.k][0]+(m.n>1?'（'+m.n+MS_KIND[m.k][1]+'）':'');
+function msState(g){const M=S.missions||{list:[]};g.dc=g.dc||{};g.mc=g.mc||{};const days=weekDays(),wk='w'+days[0],got=g.mc[wk]=g.mc[wk]||{ids:[],bonus:false};
+  const cnt=k=>days.reduce((a,d)=>{const v=g.dc[k+':'+d]||0;return a+(k==='login'?Math.min(v,1):v)},0);
+  const rows=M.list.map(m=>{const n=Math.min(cnt(m.k),m.n);return {m,n,done:n>=m.n,got:got.ids.includes(m.id)}});
+  return {M,rows,got,all:rows.length>0&&rows.every(r=>r.got)}}
+function gMissions(){const g=gme(),st=msState(g);if(!st.M.on||!st.rows.length)return '';
+  const doneN=st.rows.filter(r=>r.done).length;
+  return '<section class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--wine)"><div class="sec-h"><h2 style="font-size:16px;margin:0">今週のミッション</h2><span class="small muted num">'+doneN+'/'+st.rows.length+' 達成</span></div>'+
+   st.rows.map(r=>'<div style="display:flex;flex-direction:column;gap:4px"><div class="kv" style="padding:0"><span style="font-size:14px">'+(r.got?'<span class="chip chip-ok">受取済み</span> ':'')+esc(msLabel(r.m))+'</span><span style="display:flex;gap:8px;align-items:center"><b class="num" style="color:var(--wine);white-space:nowrap">＋'+r.m.pt+'pt</b>'+(r.done&&!r.got?'<button type="button" class="btn btn-primary btn-sm" data-act="ms-claim" data-v="'+r.m.id+'">受け取る</button>':'')+'</span></div><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden" role="progressbar" aria-label="'+esc(msLabel(r.m))+'の進み具合" aria-valuemin="0" aria-valuemax="'+r.m.n+'" aria-valuenow="'+r.n+'"><div style="height:100%;width:'+Math.round(r.n/r.m.n*100)+'%;background:var(--wine)"></div></div><span class="small muted num">'+r.n+' / '+r.m.n+'</span></div>').join('')+
+   (st.M.bonus>0?'<div class="kv" style="padding:8px 0 0;border-top:1px dashed var(--line)"><span style="font-size:14px"><b>全部達成ボーナス</b></span><span style="display:flex;gap:8px;align-items:center"><b class="num" style="color:var(--wine);white-space:nowrap">＋'+st.M.bonus+'pt</b>'+(st.got.bonus?'<span class="chip chip-ok">受取済み</span>':st.all?'<button type="button" class="btn btn-primary btn-sm" data-act="ms-bonus">受け取る</button>':'')+'</span></div>':'')+
+   '<p class="small muted" style="margin:0">'+weekEnd()+'（日）まで。毎週月曜0時にリセット。ミッションの数・内容・ポイントは仮です。</p></section>';
+}
+function aMissions(){const M=S.missions;
+  return '<div class="card panel"><h2>週間ミッションの設定</h2><p class="note">数・内容・ポイントはミーティングで決める予定です。1週間（月曜〜日曜）の合計で達成になり、毎週月曜0時にリセットされます。ログインは「ログインした日数」で数えます。ここで変えると、すぐに女性のマイページに反映されます。</p>'+
+   '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ms-on" '+(M.on?'checked':'')+' style="width:20px;height:20px">週間ミッションを表示する</label>'+
+   '<div class="tbl-wrap"><table><thead><tr><th>内容</th><th>回数</th><th>ポイント</th><th></th></tr></thead><tbody>'+(M.list.map(m=>'<tr><td>'+esc(MS_KIND[m.k][0])+'</td><td class="num">'+m.n+MS_KIND[m.k][1]+'</td><td class="num">'+m.pt+'pt</td><td class="act"><button class="btn btn-ghost btn-sm" data-act="ms-del" data-v="'+m.id+'">外す</button></td></tr>').join('')||'<tr><td colspan="4" class="muted">ミッションがありません</td></tr>')+'</tbody></table></div>'+
+   '<form data-form="ms-add" class="form-grid"><div class="field"><label for="msk">内容</label><select class="input" id="msk" name="k">'+Object.entries(MS_KIND).map(([k,v])=>'<option value="'+k+'">'+v[0]+'</option>').join('')+'</select></div><div class="field"><label for="msn">回数</label><input class="input num" id="msn" name="n" type="number" min="1" max="50" value="1"></div><div class="field"><label for="msp">ポイント</label><input class="input num" id="msp" name="pt" type="number" min="1" max="500" value="5"></div><div class="field" style="justify-content:flex-end"><button class="btn btn-primary" type="submit">ミッションを追加</button></div></form>'+
+   '<form data-form="ms-bonus-set" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div class="field"><label for="msb">全部達成ボーナス（0でなし）</label><input class="input num" id="msb" name="b" type="number" min="0" max="500" value="'+M.bonus+'"></div><button class="btn btn-ghost" type="submit">ボーナスを保存</button></form></div>';
+}
+function gPoints(){const g=gme();g.jh=g.jh||[];g.jc=g.jc||{};const reqs=(S.gpReq||[]).filter(r=>r.code===g.code);
+  return '<div class="sec-h"><h1 class="pg-h">Jポイント</h1><button class="linkbtn" data-act="gtab" data-v="home">ホームへ</button></div>'+
+   '<section class="bal-card" style="background:var(--wine)"><div style="display:flex;flex-direction:column"><span class="small" style="font-weight:700">Jポイント残高</span><span class="v num">'+yen(g.jp||0)+'<span style="font-size:15px"> pt</span></span></div></section>'+
+   '<p class="note">お客様のJコインとは別の財布です。お金には換えず、働きやすさにつながる特典と交換します。数字はたたき台です。</p>'+
+   '<section class="sec"><h2 style="font-size:16px">貯める</h2><div class="card list">'+Object.entries(JP_RULES).map(([k,[v,cap,l,note]])=>{const n=g.jc[k+':'+(k==='shift'?S.ui.ym:today())]||0;return '<div class="kv"><span>'+l+'<br><span class="small muted">'+note+'</span></span><span style="text-align:right"><b class="num" style="color:var(--wine);white-space:nowrap">＋'+v+'pt</b><br><span class="small muted num">'+n+'/'+cap+'</span></span></div>'}).join('')+'</div></section>'+
+   '<section class="sec"><h2 style="font-size:16px">交換所</h2><div class="g2">'+JP_ITEMS.map(([k,l,v])=>'<div class="card use"><b style="line-height:1.35">'+l+'</b><div class="foot"><span class="num" style="color:var(--wine);font-weight:700">'+v+'pt</span><button type="button" class="btn btn-primary btn-sm" data-act="jp-ex" data-v="'+k+'"'+((g.jp||0)<v?' disabled':'')+'>交換</button></div></div>').join('')+'</div></section>'+
+   (reqs.length?'<section class="sec"><h2 style="font-size:16px">交換の申請</h2><div class="card list">'+reqs.slice().reverse().map(r=>'<div class="kv"><span>'+esc(r.name)+'</span><span class="chip '+(r.status==='done'?'chip-ok':r.status==='back'?'chip-ng':'chip-wait')+'">'+(r.status==='done'?'受け渡し済み':r.status==='back'?'差し戻し（返却済み）':'店舗が確認中')+'</span></div>').join('')+'</div></section>':'')+
+   '<section class="sec"><h2 style="font-size:16px">履歴</h2><div class="card list">'+(g.jh.slice(0,8).map(h=>'<div class="kv"><span><span class="small muted">'+md(h.t)+'</span> '+esc(h.r)+'</span><b class="num">'+(h.v>0?'＋':'−')+Math.abs(h.v)+'pt</b></div>').join('')||'<div class="empty">まだ履歴はありません</div>')+'</div></section>';}
+function weekCounts(g){
+  const cnt=[0,0,0,0,0,0,0];
+  S.shifts.filter(s=>s.ym===S.ui.ym&&s.submitted&&comp(s.code).store===g.store).forEach(s=>s.entries.forEach(e=>{if(!e.off)cnt[new Date(e.date+'T00:00:00').getDay()]++}));
+  const lv=n=>n<=1?['少なめ','chip-ng']:n<=3?['ふつう','chip-wait']:['多め','chip-ok'];
+  return '<div class="card" style="padding:12px 14px;display:flex;flex-direction:column;gap:8px"><span class="small" style="font-weight:700">'+mL(S.ui.ym)+'の曜日ごとの出勤希望（'+esc(g.store)+'・目安）</span><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center">'+
+   [1,2,3,4,5,6,0].map(d=>{const [l,c]=lv(cnt[d]);return '<div style="display:flex;flex-direction:column;gap:2px;align-items:center"><span class="small muted">'+WD[d]+'</span><b class="num">'+cnt[d]+'</b><span class="chip '+c+'" style="font-size:10.5px;padding:0 4px">'+l+'</span></div>'}).join('')+
+   '</div><span class="small muted">提出された希望の延べ人数です（名前は表示しません）。「少なめ」の曜日は希望が通りやすい目安です。</span></div>';
+}
+function aGPoint(){
+  const reqs=(S.gpReq||[]).slice().sort((a,b)=>(a.status==='wait'?0:1)-(b.status==='wait'?0:1)||b.t-a.t);
+  const ym=new Date().getFullYear()+'-'+(new Date().getMonth()+1);
+  const rank=S.comps.filter(c=>c.active).map(c=>[c,(c.jh||[]).filter(h=>h.v>0&&(new Date(h.t).getFullYear()+'-'+(new Date(h.t).getMonth()+1))===ym).reduce((a,h)=>a+h.v,0)]).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  return '<h1>Jポイント（女性向け）</h1><p class="note">お客様のJコインとは別の財布です。付与ルールはたたき台（写メ日記10pt・24時間以内の返信5pt・シフト提出30pt・顧客メモ3pt・ログイン1pt）。</p>'+
+   aMissions()+
+   '<div class="card panel"><h2>交換の申請</h2><div class="tbl-wrap"><table><tbody>'+(reqs.map(r=>'<tr><td>'+(r.status==='wait'?'<span class="chip chip-wait">確認中</span>':r.status==='done'?'<span class="chip chip-ok">受け渡し済み</span>':'<span class="chip chip-ng">差し戻し</span>')+'</td><td>'+md(r.t)+'</td><td>'+esc(comp(r.code).name)+'</td><td>'+esc(r.name)+'（'+r.pt+'pt）</td><td class="act">'+(r.status==='wait'?'<button class="btn btn-primary btn-sm" data-act="gp-done" data-v="'+r.id+'">受け渡し済みにする</button> <button class="btn btn-ghost btn-sm" data-act="gp-back" data-v="'+r.id+'">差し戻し（返却）</button>':'')+'</td></tr>').join('')||'<tr><td class="empty">申請はありません</td></tr>')+'</tbody></table></div></div>'+
+   '<form class="card panel" data-form="gp-grant"><h2>特別付与（新人応援・イベントなど）</h2><div class="form-grid"><div class="field"><label for="gpc">女性</label><select class="input" id="gpc" name="code">'+S.comps.filter(c=>c.active).map(c=>'<option value="'+esc(c.code)+'">'+esc(c.name)+'（'+esc(c.store)+'）</option>').join('')+'</select></div><div class="field"><label for="gpv">ポイント</label><input class="input num" id="gpv" name="v" type="number" min="1" max="1000" value="50"></div><div class="field"><label for="gpr">理由</label><input class="input" id="gpr" name="r" maxlength="30" placeholder="新人応援"></div></div><div><button class="btn btn-primary" type="submit">付与する</button></div></form>'+
+   '<div class="card panel"><h2>今月の獲得ポイント</h2>'+(rank.some(r=>r[1]>0)?hbars(rank.filter(r=>r[1]>0).map(([c,v])=>[c.name,v])):'<div class="empty">今月の獲得はまだありません</div>')+'<p class="note">月間の表彰にも使えます。ボーナス（お金）に反映するかは未定です。</p></div>';
+}
+
+/* ===== 管理画面 ===== */
+function renderAdmin(){
+  const c={rv:S.reviews.filter(r=>r.status==='pending').length,bd:S.posts.filter(p=>p.reports>0&&!p.dismissed).length,rq:S.requests.filter(r=>r.status==='wait').length,tk:S.rooms.filter(r=>r.flags.length&&!r.flagSeen).length};
+  const groups=[['共通',[['dash','概要'],['stats','アクセス分析'],['roster','女性の名簿'],['talk','J chatの見守り',c.tk]]],
+    ['お客様向け',[['banner','バナー'],['news','お知らせ'],['newbie','新人・動画'],['grant','Jコイン付与'],['review','口コミ承認',c.rv],['req','交換申請',c.rq],['gacha','ガチャ'],['juku','熟フェチ図鑑']]],
+    ['女性向け',[['gnotice','女性へのお知らせ'],['gcolumn','コラム'],['gshift','シフト希望一覧'],['gdiary','写メ日記'],['gmemo','顧客メモ'],['gpoint','Jポイント',(S.gpReq||[]).filter(r=>r.status==='wait').length]].filter(x=>GFEAT[{gshift:'shift',gmemo:'memo',gpoint:'points'}[x[0]]]!==false)]];
+  const t=S.ui.aTab, fn={dash:aDash,stats:aStats,roster:aRoster,talk:aTalk,news:aNews,banner:aBanner,newbie:aNewbie,grant:aGrant,review:aReview,board:aBoard,req:aReq,gacha:aGacha,juku:aJuku,gcolumn:aGColumn,gnotice:aGNotice,gshift:aGShift,gdiary:aGDiary,gmemo:aGMemo,gpoint:aGPoint}[t];
+  const vw=S.ui.aView||'auto', sp=vw==='sp'||(vw==='auto'&&innerWidth<760), cur=groups.flatMap(g=>g[1]).find(x=>x[0]===t)||['',''], tot=groups.flatMap(g=>g[1]).reduce((a,x)=>a+(x[2]||0),0);
+  const sw='<div class="aview"><span class="small muted">表示</span><div class="seg seg-sm" role="group" aria-label="管理画面の表示">'+[['auto','自動'],['pc','PC'],['sp','スマホ']].map(([k,l])=>'<button type="button" data-act="aview" data-v="'+k+'" aria-pressed="'+(vw===k)+'">'+l+'</button>').join('')+'</div></div>';
+  if(sp){const menu=S.ui.aMenu;
+    return sw+'<div class="admin sp'+(vw==='sp'&&innerWidth>=760?' framed':'')+'"><div class="sp-bar"><span class="ttl"><b>'+esc(cur[1])+'</b><span>'+esc(S.ui.store)+'</span></span><button type="button" class="mbtn" data-act="amenu" aria-expanded="'+!!menu+'">'+(menu?'閉じる':'メニュー')+(tot&&!menu?'<span class="badge">'+tot+'</span>':'')+'</button></div>'+
+     (menu?'<aside class="a-side" aria-label="管理メニュー"><div class="who"><div class="field"><label for="st">ログイン中の店舗</label><select class="input" id="st">'+STORES.map(s=>'<option'+(s===S.ui.store?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select></div></div>'+
+       groups.map(g=>'<div class="grp">'+g[0]+'</div>'+g[1].map(x=>'<button type="button" class="nav" data-act="atab" data-v="'+x[0]+'"'+(t===x[0]?' aria-current="page"':'')+'><span>'+x[1]+'</span>'+(x[2]?'<span class="badge">'+x[2]+'</span>':'')+'</button>').join('')).join('')+'</aside>':'<div class="a-main">'+helpBox('a-'+t)+fn()+'</div>')+'</div>';}
+  return sw+'<div class="admin"><aside class="a-side" aria-label="管理メニュー"><div class="who"><b style="font-family:var(--font-display)">共通管理画面</b><div class="field"><label for="st">ログイン中の店舗</label><select class="input" id="st">'+STORES.map(s=>'<option'+(s===S.ui.store?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select></div></div>'+
+   groups.map(g=>'<div class="grp">'+g[0]+'</div>'+g[1].map(x=>'<button type="button" class="nav" data-act="atab" data-v="'+x[0]+'"'+(t===x[0]?' aria-current="page"':'')+'><span>'+x[1]+'</span>'+(x[2]?'<span class="badge">'+x[2]+'</span>':'')+'</button>').join('')).join('')+
+   '</aside><div class="a-main">'+helpBox('a-'+t)+fn()+'</div></div>';
+}
+const stat=(l,v,s)=>'<div class="card stat"><span class="small muted">'+l+'</span><span class="v num">'+v+'</span>'+(s?'<span class="small muted">'+s+'</span>':'')+'</div>';
+const delBtn=(k,id)=>'<button type="button" class="btn btn-danger btn-sm" data-act="ask-del" data-k="'+k+'" data-v="'+id+'">削除</button>';
+function aDash(){const us=Object.values(S.users);
+  return '<h1>概要</h1><div class="stats">'+stat('お客様会員',us.length+'人')+stat('在籍中の女性',activeComps().length+'人')+stat('トーク（やり取り中）',S.rooms.filter(r=>r.status==='open').length+'件')+stat('お気に入り申請中',S.rooms.filter(r=>r.status==='requested').length+'件')+stat('口コミ承認待ち',S.reviews.filter(r=>r.status==='pending').length+'件')+'</div>'+
+   '<div class="card panel"><h2>お客様会員</h2><div class="tbl-wrap"><table><thead><tr><th>電話番号</th><th>ニックネーム</th><th>残高</th><th>最終ログイン</th><th>年齢</th><th>状態</th><th></th></tr></thead><tbody>'+us.map(u=>'<tr><td class="num">'+mask(u.phone)+'</td><td>'+esc(u.nick)+'</td><td class="num">'+yen(u.coins)+'J</td><td>'+(u.lastLogin||'—')+'</td><td>'+esc((u.attr||{}).self||'未登録')+'</td><td>'+(u.limited?'<span class="chip chip-ng">利用制限中</span>':'<span class="chip chip-ok">通常</span>')+'</td><td class="act"><button class="btn '+(u.limited?'btn-ghost':'btn-danger')+' btn-sm" data-act="u-limit" data-v="'+u.phone+'">'+(u.limited?'制限を解除':'利用を制限')+'</button></td></tr>').join('')+'</tbody></table></div><p class="note">「利用を制限」すると、そのお客様はJ chatの送信・お気に入り申請・口コミの投稿ができなくなります。電話番号は伏せ字で表示しています。全桁はJコイン付与など必要な場面だけ使います。</p></div>'+
+   '<p class="note">このデモは1台のブラウザ内でデータを保存します。3つの画面は同じデータを使うので、お客様画面で送ったトークがコンパニオン画面に届きます。</p>';}
+function hbars(rows){const max=Math.max(1,...rows.map(r=>r[1]));return '<div class="hb">'+rows.map(r=>'<div class="hb-row" title="'+esc(r[0])+'：'+yen(r[1])+'回"><span class="hb-l">'+esc(r[0])+'</span><span class="hb-track"><span class="hb-bar" style="width:'+Math.max(2,r[1]/max*100)+'%"></span></span><span class="hb-v num">'+yen(r[1])+'</span></div>').join('')+'</div>'}
+function aStats(){const st=S.stats,us=Object.values(S.users),tot=st.baseReg+us.length,inst=st.baseInstalled+us.filter(u=>u.installed).length;
+  const days=[];for(let i=13;i>=0;i--){const t=Date.now()-i*day;days.push([md(t),st.reg[dkey(t)]||0])}
+  const max=Math.max(1,...days.map(d=>d[1])),wk=days.slice(7).reduce((a,d)=>a+d[1],0),pv=days.slice(0,7).reduce((a,d)=>a+d[1],0);
+  const tn={home:'ホーム',talk:'J chat',reviews:'口コミ',board:'掲示板',coin:'Jコイン'},cn={media:'体験動画・グラビア',newbie:'新人情報',news:'お知らせ',banner:'バナー',youtube:'公式YouTube'};
+  return '<h1>アクセス分析</h1><p class="note">[例] のサンプル数値に、このデモで操作した分が加算されます。本番はFirebase Analyticsの実データです。</p><div class="stats">'+stat('登録者数',yen(tot)+'人')+stat('ホーム画面追加率',Math.round(inst/tot*1000)/10+'%',yen(inst)+'人が追加')+stat('直近7日の新規登録',wk+'人','前の7日より'+(wk>=pv?'＋':'−')+Math.abs(wk-pv)+'人')+'</div>'+
+   '<div class="card panel"><h2>新規登録数（直近14日）</h2><div class="vb">'+days.map((d,i)=>'<div class="vb-col" title="'+d[0]+'：'+d[1]+'人"><span class="vb-v num">'+(i===13||d[1]===max?d[1]:'')+'</span><span class="vb-bar" style="height:'+Math.max(2,d[1]/max*100)+'%"></span><span class="vb-x">'+(i%2?d[0]:'')+'</span></div>').join('')+'</div></div>'+
+   '<div class="split"><div class="card panel"><h2>画面別アクセス数</h2>'+hbars(Object.entries(st.tabs).filter(([k])=>CFEAT[k]!==false).map(([k,v])=>[tn[k]||k,v]).sort((a,b)=>b[1]-a[1]))+'</div><div class="card panel"><h2>コンテンツ別の閲覧数</h2>'+hbars(Object.entries(st.content).map(([k,v])=>[cn[k]||k,v]).sort((a,b)=>b[1]-a[1]))+'</div></div>';}
+function aRoster(){
+  const imp=S.ui.imp;
+  const rows=S.comps.slice().sort((a,b)=>a.store.localeCompare(b.store)||a.code.localeCompare(b.code)).map(c=>'<tr><td class="num">'+esc(c.code)+'</td><td><span style="display:inline-flex;gap:8px;align-items:center">'+av(c,28)+esc(c.name)+'</span></td><td>'+esc(c.store)+'</td><td>'+(c.active?'<span class="chip chip-ok">在籍中</span>':'<span class="chip chip-ng">退店</span>')+'</td><td>'+(!c.talkOn?'<span class="muted">受け付けない（店舗）</span>':c.selfOff?'<span class="muted">お休み中（本人）</span>':'受け付ける')+'</td><td>'+(siteUrl(c)?profLink(c,'開く'):'<span class="chip chip-wait">未ひも付け</span>')+'</td><td class="act"><button class="btn btn-ghost btn-sm" data-act="c-edit" data-v="'+esc(c.code)+'">プロフィール</button> <button class="btn btn-ghost btn-sm" data-act="c-talk" data-v="'+esc(c.code)+'">トーク'+(c.talkOn?'停止':'受付')+'</button> <button class="btn btn-ghost btn-sm" data-act="c-active" data-v="'+esc(c.code)+'">'+(c.active?'退店にする':'在籍に戻す')+'</button></td></tr>').join('');
+  return '<h1>女性の名簿</h1>'+
+   '<div class="card panel"><h2>Excelから取り込む（給与一覧）</h2><p class="note">読み込むのは「担当者コード」と「担当者（源氏名）」の2列だけです。給料・ポイント・本数などほかの列は読み込まずに捨てます。ファイル自体も保存しません。</p>'+
+   '<div class="form-grid"><div class="field"><label for="imp-store">取り込む店舗</label><select class="input" id="imp-store">'+STORES.map(s=>'<option'+(imp&&imp.store===s?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select></div><div class="field"><label for="imp-file">Excelファイル（.xlsx）</label><input class="input" id="imp-file" type="file" accept=".xlsx,.xls"></div></div><p class="err" id="imp-err"></p>'+
+   (imp&&imp.rows?'<div class="card" style="padding:12px;background:var(--surface-2);display:flex;flex-direction:column;gap:8px"><b>読み込み結果：'+imp.rows.length+'人（新規 '+imp.rows.filter(r=>!S.comps.find(c=>c.code===r.code)).length+'人・更新 '+imp.rows.filter(r=>S.comps.find(c=>c.code===r.code)).length+'人）</b><span class="small muted">店舗：'+esc(imp.store)+'　読み込まなかった列：'+imp.skipped+'列</span><div class="tbl-wrap" style="max-height:200px;overflow:auto"><table><thead><tr><th>担当者コード</th><th>源氏名</th><th></th></tr></thead><tbody>'+imp.rows.slice(0,50).map(r=>'<tr><td class="num">'+esc(r.code)+'</td><td>'+esc(r.name)+'</td><td>'+(S.comps.find(c=>c.code===r.code)?'更新':'<span class="chip chip-new">新規</span>')+'</td></tr>').join('')+'</tbody></table></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" data-act="imp-ok">この内容で取り込む</button><button class="btn btn-ghost" data-act="imp-cancel">やめる</button></div></div>':'')+'</div>'+
+   '<div class="card panel"><h2>サイトからプロフィールを取り込む（本番の動き）</h2>'+
+   '<div class="tbl-wrap"><table><thead><tr><th>グループ</th><th>ひも付け</th><th>プロフィールURL</th></tr></thead><tbody>'+
+   '<tr><td>PLUS</td><td>担当者コード＝URLの最後（自動）</td><td class="small">jukujoya-plus.jp/<b>店舗</b>/ms_lady/<b>担当者コード</b><br>店舗：umeda（梅田）・juso（十三）・namba（難波）・takaida（東大阪）</td></tr>'+
+   '<tr><td>熟女家</td><td>源氏名で自動（全店で名前の重なりなし）＋一致しない人だけ手動</td><td class="small"><b>店舗</b>.jukujoya.jp/ms_lady/detail/<b>サイトID</b>/<br>店舗：umeda（梅田）・juso（十三）・kyobashi（京橋）・sakai（堺東）・ho（豊中蛍池）・fuse（東大阪）・ueroku（ミナミ・エリア）</td></tr></tbody></table></div>'+
+   '<ul class="small" style="margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px"><li>PLUS：店舗ごとの女性一覧から「年齢・身長（T）・カップ（Bの括弧内）」を読み取ります（例：45 歳 T158 B89(F)）。ホテルデリ・自宅デリ・タバコは、サイトの絞り込みページに載っているかで判定します</li><li>熟女家：女性一覧（1ページ40人・複数ページ）から「源氏名(年齢)・T・B(カップ)」とサイトIDを読み取ります。タバコ・ホテル／自宅デリバリーは各プロフィールページから読み取ります</li><li>本番ではサーバーが1日1回自動で読み直します。試作ページの中からはサイトを読みに行けないため、ここでは仕組みの説明だけです</li></ul></div>'+
+   '<form class="card panel" data-form="comp-add"><h2>1人ずつ追加（入店時）</h2><div class="form-grid"><div class="field"><label for="ca-code">担当者コード</label><input class="input num" id="ca-code" name="code" required></div><div class="field"><label for="ca-name">源氏名</label><input class="input" id="ca-name" name="name" maxlength="12" required></div><div class="field"><label for="ca-store">店舗</label><select class="input" id="ca-store" name="store">'+STORES.map(s=>'<option'+(s===S.ui.store?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select></div></div><p class="err" id="ca-err"></p><div><button class="btn btn-primary" type="submit">追加する</button></div></form>'+
+   '<div class="card panel"><h2>名簿（'+S.comps.length+'人）</h2><div class="tbl-wrap"><table><thead><tr><th>担当者コード</th><th>源氏名</th><th>店舗</th><th>在籍</th><th>J chat</th><th>サイト</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">「退店」にすると、マイページに入れなくなり、お客様側の一覧からも消えます。</p></div>';
+}
+function aTalk(){
+  S.rooms.forEach(r=>{if(r.flags.length)r.flagSeen=true});
+  const sel=S.rooms.find(r=>r.id===S.ui.aRoom);
+  const st=r=>r.status==='open'?'<span class="chip chip-ok">やり取り中</span>':pend(r)?'<span class="chip chip-wait">女性の承認待ち</span>':r.status==='blocked'?'<span class="chip chip-ng">女性がブロック</span>':'<span class="chip chip-ng">停止中</span>';
+  const sq=S.rooms.filter(r=>pend(r)), M=S.match;
+  return '<h1>J chatの見守り</h1>'+
+   '<form class="card panel" data-form="match-set"><h2>自動マッチングの設定</h2><p class="note">お客様が登録時に選んだ好み（体型・年齢・カップ・ジャンル・よく使う店舗）に合う女性と、登録した直後に自動でJ chatをつなぎます（女性の承認なし）。あとから止めたり人数を変えたりできます。</p><div class="form-grid"><div class="field"><label for="mt-on">自動マッチング</label><select class="input" id="mt-on" name="auto"><option value="1"'+(M.auto?' selected':'')+'>使う</option><option value="0"'+(M.auto?'':' selected')+'>使わない（申請→承認だけ）</option></select></div><div class="field"><label for="mt-n">つなぐ人数（最大）</label><input class="input num" id="mt-n" name="n" type="number" min="1" max="100" value="'+M.n+'"></div></div><div><button class="btn btn-primary" type="submit">保存する</button></div></form>'+
+   '<div class="card panel"><h2>女性の承認待ち（お気に入り申請）</h2><p class="note">流れ：お客様が申請 → <b>女性が承認</b> → トーク開始。店舗がここで「相互お気に入りにする」を押すと、女性の承認なしですぐ始まります。</p>'+(sq.length?'<div class="list">'+sq.map(r=>{const u=S.users[r.phone]||{nick:'?'},g=comp(r.code);return '<div class="kv"><span><b>'+esc(u.nick)+'</b> → <b>'+esc(g.name)+'</b><br><span class="small muted">'+esc(g.store)+'・'+md(r.t)+' '+hm(r.t)+' に申請・'+mask(r.phone)+'</span>'+(u.limited?'<br><span class="chip chip-ng">利用制限中の会員</span>':'')+'</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" data-act="a-mutual" data-v="'+r.id+'">♡ 相互お気に入りにする</button><button class="btn btn-ghost btn-sm" data-act="a-fav-ng" data-v="'+r.id+'">お断り</button></span></div>'}).join('')+'</div>':'<div class="empty">承認待ちの申請はありません</div>')+'</div>'+
+   '<form class="card panel" data-form="open-room"><h2>店舗から相互お気に入りにする（ご利用後など）</h2><p class="note">電話番号と女性を選ぶと、すぐにトークを始められます。</p><div class="form-grid"><div class="field"><label for="or-phone">お客様の電話番号</label><input class="input num" id="or-phone" name="phone" inputmode="numeric" placeholder="09000000002" required></div><div class="field"><label for="or-code">女性</label><select class="input" id="or-code" name="code">'+activeComps().map(c=>'<option value="'+esc(c.code)+'">'+esc(c.name)+'（'+esc(c.store)+'）</option>').join('')+'</select></div></div><p class="err" id="or-err"></p><div><button class="btn btn-primary" type="submit">相互お気に入りにする</button></div></form>'+
+   '<div class="split"><div class="card panel"><h2>J chat一覧</h2>'+(S.rooms.length?'<div class="list">'+S.rooms.slice().sort((a,b)=>(b.flags.length-a.flags.length)||b.t-a.t).map(r=>{const u=S.users[r.phone]||{nick:'?'},g=comp(r.code);return '<button type="button" class="row-btn" style="padding:10px 4px;'+(sel&&sel.id===r.id?'background:var(--surface-2)':'')+'" data-act="a-room" data-v="'+r.id+'"><span style="flex:1;min-width:0"><b>'+esc(u.nick)+'</b> ⇄ <b>'+esc(g.name)+'</b><br><span class="small muted">'+esc(g.store)+'・'+r.msgs.length+'通・'+(BY[r.by]||'')+'</span></span><span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">'+st(r)+(r.flags.length?'<span class="chip chip-ng">検知・通報 '+r.flags.length+'</span>':'')+'</span></button>'}).join('')+'</div>':'<div class="empty">トークはまだありません</div>')+'</div>'+
+   (sel?'<div class="card panel"><h2>'+esc((S.users[sel.phone]||{}).nick||'')+'（'+mask(sel.phone)+'）⇄ '+esc(comp(sel.code).name)+'</h2>'+(!pend(sel)&&sel.status!=='blocked'?'<button class="btn '+(sel.status==='stopped'?'btn-ghost':'btn-danger')+' btn-sm" style="align-self:flex-start" data-act="a-stop" data-v="'+sel.id+'">'+(sel.status==='stopped'?'トークを再開':'このトークを停止')+'</button>':'<p class="note">'+(sel.status==='blocked'?'女性がこのお客様をブロックしています。':'女性の承認待ちです（上の「女性の承認待ち」から相互お気に入りにできます）。')+'</p>')+
+     sel.flags.map(f=>'<div class="bw sys"><div class="bubble">'+md(f.t)+' '+hm(f.t)+'　'+esc(f.by)+'：'+esc(f.reason)+(f.text?'「'+esc(f.text)+'」':'')+'</div></div>').join('')+
+     '<div class="chat" style="min-height:0">'+(sel.msgs.map(m=>'<div class="bw '+(m.from==='g'?'me':'them')+'"><div class="bubble">'+esc(m.text)+'</div><span class="small muted">'+(m.from==='g'?esc(comp(sel.code).name):'お客様')+'・'+md(m.t)+' '+hm(m.t)+'</span></div>').join('')||'<div class="empty">メッセージはまだありません</div>')+'</div></div>':'<div class="card panel"><div class="empty">左の一覧からトークを選ぶと、内容を確認できます。</div></div>')+'</div>';
+}
+function aNews(){return '<h1>お知らせ・バナー</h1><form class="card panel" data-form="news"><h2>お知らせを投稿（'+esc(S.ui.store)+'）</h2><div class="field"><label for="nt">タイトル</label><input class="input" id="nt" name="title" maxlength="40" required></div><div class="field"><label for="nb">本文</label><textarea class="input" id="nb" name="body"></textarea></div><div><button class="btn btn-primary" type="submit">投稿する</button></div></form>'+
+  '<div class="card panel"><h2>お知らせ一覧</h2><div class="tbl-wrap"><table><tbody>'+S.news.slice().sort((a,b)=>b.t-a.t).map(n=>'<tr><td>'+md(n.t)+'</td><td>'+esc(n.store)+'</td><td>'+esc(n.title)+'</td><td class="act">'+delBtn('news',n.id)+'</td></tr>').join('')+'</tbody></table></div></div>'}
+function aBanner(){const img=S.ui.bnimg;
+  const rows=S.banners.map((b,i)=>'<tr><td>'+(b.photo?'<img class="bn-thumb" src="'+bnSrc(b.photo)+'" alt="">':'<span class="chip '+(b.color==='navy'?'chip-wait':'chip-new')+'">文字のみ</span>')+'</td><td><b>'+esc(b.title)+'</b><br><span class="small muted">'+esc(b.label||'')+(b.url?'・リンクあり':'')+'</span></td><td>'+(b.off?'<span class="chip chip-ng">非表示</span>':'<span class="chip chip-ok">表示中</span>')+'</td><td class="act"><button class="btn btn-ghost btn-sm" data-act="bn-up" data-v="'+b.id+'"'+(i?'':' disabled')+' aria-label="上へ">↑</button> <button class="btn btn-ghost btn-sm" data-act="bn-down" data-v="'+b.id+'"'+(i<S.banners.length-1?'':' disabled')+' aria-label="下へ">↓</button> <button class="btn btn-ghost btn-sm" data-act="bn-off" data-v="'+b.id+'">'+(b.off?'表示する':'非表示にする')+'</button> '+delBtn('banner',b.id)+'</td></tr>').join('')||'<tr><td class="muted">バナーはまだありません</td></tr>';
+  return '<h1>バナー</h1><form class="card panel" data-form="banner"><h2>バナーを追加</h2>'+
+   '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="bn-prev" id="bn-prev">'+(img?'<img src="'+img+'" alt="選んだ画像">':'画像なし（文字のバナーになります）')+'</div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><label class="btn btn-ghost btn-sm" for="bnphoto">画像を選ぶ</label><input id="bnphoto" type="file" accept="image/*" class="sr"><span class="small muted">横840×縦372px（横長）に自動で切り抜きます</span>'+(img?'<button type="button" class="linkbtn" data-act="bn-clear">画像を外す</button>':'')+'</div></div>'+
+   '<div class="form-grid"><div class="field"><label for="bt">タイトル</label><input class="input" id="bt" name="title" maxlength="30" required placeholder="[例] 10月のイベント"></div><div class="field"><label for="bl">小見出し（文字のバナーのとき）</label><input class="input" id="bl" name="label" maxlength="16" placeholder="期間限定イベント"></div><div class="field"><label for="bc">色（文字のバナーのとき）</label><select class="input" id="bc" name="color"><option value="orange">オレンジ</option><option value="navy">ネイビー</option></select></div></div>'+
+   '<div class="field"><label for="bu">リンク先URL（任意）</label><input class="input" id="bu" name="url" type="url" placeholder="https://"></div><div class="field"><label for="bb">押したときの説明（任意）</label><textarea class="input" id="bb" name="body" rows="3"></textarea></div>'+
+   '<p class="note">画像を選ぶと画像のバナー、選ばないと文字のバナーになります。新しいバナーは一番左（先頭）に入ります。</p><div><button class="btn btn-primary" type="submit">追加する</button></div></form>'+
+   '<div class="card panel"><h2>バナー一覧（左から表示される順）</h2><div class="tbl-wrap"><table><tbody>'+rows+'</tbody></table></div></div>'}
+function aNewbie(){return '<h1>新人・体験動画・グラビア</h1><form class="card panel" data-form="newbie"><h2>新人情報を投稿（'+esc(S.ui.store)+'）</h2><div style="display:flex;gap:14px;align-items:center"><span id="nb-prev">'+rectPh(S.ui.nbimg,78,'選んだ写真')+'</span><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><label class="btn btn-ghost btn-sm" for="nbphoto">写真を選ぶ</label><input id="nbphoto" type="file" accept="image/*" class="sr"><span class="small muted">横390×縦520px（縦長）に自動で切り抜きます</span></div></div><div class="form-grid"><div class="field"><label for="nn">源氏名</label><input class="input" id="nn" name="name" maxlength="12" required></div><div class="field"><label for="nc">担当者コード</label><input class="input num" id="nc" name="code" placeholder="入れると名簿にも登録"></div><div class="field"><label for="nd">入店日</label><input class="input" id="nd" name="date" type="date" required></div></div><p class="note">担当者コードを入れると、女性の名簿にも同時に登録され、マイページに入れるようになります。</p><div><button class="btn btn-primary" type="submit">投稿する</button></div></form>'+
+  '<form class="card panel" data-form="media"><h2>体験動画・グラビアの更新</h2><div class="form-grid"><div class="field"><label for="mt">種類</label><select class="input" id="mt" name="type"><option>体験動画</option><option>グラビア</option></select></div><div class="field"><label for="mnm">源氏名</label><input class="input" id="mnm" name="name" maxlength="12" required></div></div><div><button class="btn btn-primary" type="submit">登録する（NEW表示）</button></div></form>'+
+  '<div class="card panel"><h2>登録済み</h2><div class="tbl-wrap"><table><tbody>'+S.newbies.map(n=>'<tr><td>新人</td><td>'+esc(n.name)+'</td><td>'+esc(n.store)+'</td><td>'+md(n.t)+'</td><td class="act">'+delBtn('newbie',n.id)+'</td></tr>').join('')+S.media.map(m=>'<tr><td>'+esc(m.type)+'</td><td>'+esc(m.name)+'</td><td>'+esc(m.store)+'</td><td>'+md(m.t)+'</td><td class="act">'+delBtn('media',m.id)+'</td></tr>').join('')+'</tbody></table></div></div>'}
+function aGrant(){return '<h1>Jコイン付与</h1><form class="card panel" data-form="grant"><div class="form-grid"><div class="field"><label for="gp">電話番号</label><input class="input num" id="gp" name="phone" inputmode="numeric" required></div><div class="field"><label for="ga">付与するJコイン</label><input class="input num" id="ga" name="amount" type="number" min="1" max="5000" value="50" required></div><div class="field"><label for="gr">理由</label><select class="input" id="gr" name="reason"><option>ご利用</option><option>イベント参加</option><option>お詫び</option><option>その他</option></select></div></div><p class="err" id="gp-err"></p><div><button class="btn btn-primary" type="submit">付与する</button></div></form><p class="note">付与はすべて店舗名と一緒に履歴に残ります。</p>'}
+function aReview(){return '<h1>口コミ承認</h1><div class="card panel"><div class="tbl-wrap"><table><thead><tr><th>状態</th><th>女性</th><th>評価</th><th>内容</th><th></th></tr></thead><tbody>'+S.reviews.slice().sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)||b.t-a.t).map(r=>'<tr><td>'+(r.status==='pending'?'<span class="chip chip-wait">承認待ち</span>':r.status==='ok'?'<span class="chip chip-ok">公開中</span>':'<span class="chip chip-ng">非公開</span>')+'</td><td>'+esc(comp(r.girl).name)+'</td><td>'+stars(rvAvg(r))+' <b class="num">'+rvAvg(r).toFixed(1)+'</b><br><span class="small muted">'+RV_ITEMS.map((l,i)=>l+' '+rvSc(r)[i]).join('・')+'</span></td><td style="min-width:180px">'+esc(r.text)+'<br><span class="small muted">'+esc(r.nick)+'・'+md(r.t)+'</span></td><td class="act">'+(r.status==='pending'?'<button class="btn btn-primary btn-sm" data-act="rv-ok" data-v="'+r.id+'">承認（＋'+R.REVIEW+'J）</button> ':'')+(r.status!=='ng'?'<button class="btn btn-ghost btn-sm" data-act="rv-ng" data-v="'+r.id+'">非公開</button>':'')+'</td></tr>').join('')+'</tbody></table></div><p class="note">ご利用の確認ができた口コミだけを承認します。店舗が口コミを書き換えることはしません。</p></div>'}
+function aBoard(){return '<h1>掲示板管理</h1><form class="card panel" data-form="official"><h2>公式として投稿（'+esc(S.ui.store)+'スタッフ）</h2><div class="field"><label for="ot">内容</label><textarea class="input" id="ot" name="text" maxlength="300" required></textarea></div><div><button class="btn btn-primary" type="submit">公式投稿する</button></div></form>'+
+  '<div class="card panel"><h2>書き込み一覧</h2><div class="tbl-wrap"><table><tbody>'+S.posts.slice().sort((a,b)=>(b.reports-a.reports)||b.t-a.t).map(p=>{const u=p.phone?S.users[p.phone]:null;return '<tr><td>'+(p.hidden?'<span class="chip chip-ng">非表示</span>':p.reports>0&&!p.dismissed?'<span class="chip chip-wait">通報 '+p.reports+'</span>':'<span class="chip chip-ok">表示中</span>')+'</td><td>'+esc(p.nick)+'</td><td style="min-width:180px">'+esc(p.text)+'</td><td class="act">'+(p.hidden?'<button class="btn btn-ghost btn-sm" data-act="bd-show" data-v="'+p.id+'">再表示</button>':'<button class="btn btn-ghost btn-sm" data-act="bd-hide" data-v="'+p.id+'">非表示</button>')+(u?' <button class="btn btn-danger btn-sm" data-act="ban" data-v="'+u.phone+'">'+(u.banned?'停止を解除':'書込停止')+'</button>':'')+'</td></tr>'}).join('')+'</tbody></table></div><p class="note">通報が3件で自動非表示。違反の段階：投稿の非表示 → 書込停止 → アカウント停止（検討中）</p></div>'}
+function aReq(){return '<h1>交換申請</h1><div class="card panel"><div class="tbl-wrap"><table><tbody>'+(S.requests.slice().sort((a,b)=>b.t-a.t).map(r=>'<tr><td>'+(r.status==='wait'?'<span class="chip chip-wait">受付中</span>':r.status==='done'?'<span class="chip chip-ok">反映済み</span>':'<span class="chip chip-ng">差し戻し</span>')+'</td><td>'+md(r.t)+'</td><td class="num">'+mask(r.phone)+'</td><td>'+esc(r.type)+'（'+r.coins+'J）</td><td class="act">'+(r.status==='wait'?'<button class="btn btn-primary btn-sm" data-act="req-done" data-v="'+r.id+'">アポロに入力済み</button> <button class="btn btn-ghost btn-sm" data-act="req-back" data-v="'+r.id+'">差し戻し（返却）</button>':'')+'</td></tr>').join('')||'<tr><td class="empty">申請はありません</td></tr>')+'</tbody></table></div></div>'}
+function aGNotice(){return '<h1>女性へのお知らせ</h1><form class="card panel" data-form="gnotice"><div class="field"><label for="gnt">タイトル</label><input class="input" id="gnt" name="title" maxlength="40" required></div><div class="field"><label for="gnb">本文</label><textarea class="input" id="gnb" name="body"></textarea></div><div class="field"><label for="gns">配信先</label><select class="input" id="gns" name="store"><option>全店舗</option>'+STORES.map(s=>'<option>'+esc(s)+'</option>').join('')+'</select></div><div><button class="btn btn-primary" type="submit">配信する</button></div></form>'+
+  '<div class="card panel"><div class="tbl-wrap"><table><tbody>'+S.gNotices.slice().sort((a,b)=>b.t-a.t).map(n=>'<tr><td>'+md(n.t)+'</td><td>'+esc(n.store)+'</td><td>'+esc(n.title)+'</td><td class="act">'+delBtn('gnotice',n.id)+'</td></tr>').join('')+'</tbody></table></div></div>'}
+function aGShift(){const sub=S.shifts.filter(s=>s.submitted);return '<h1>シフト希望一覧</h1><div class="card panel">'+(sub.length?'<div class="list">'+sub.map(s=>{const g=comp(s.code);return '<article style="padding:10px 0"><div class="sec-h"><b>'+esc(g.name)+'（'+esc(g.store)+'）・'+mL(s.ym)+'</b><span class="small muted">'+md(s.submitted)+' '+hm(s.submitted)+'</span></div><pre style="margin:4px 0 0;white-space:pre-wrap;font-family:inherit;font-size:13px">'+esc(shiftText(g,s).split('\n').slice(1).join('\n'))+'</pre></article>'}).join('')+'</div>':'<div class="empty">まだ提出はありません。コンパニオン画面で「店舗に提出」を押すと並びます。</div>')+'<p class="note">確定は今までどおりアポロで行います。</p></div>'}
+function aGDiary(){return '<h1>写メ日記</h1><div class="card panel">'+(S.diaries.length?'<div class="list">'+S.diaries.slice().sort((a,b)=>b.t-a.t).map(d=>'<article style="display:flex;gap:12px;padding:10px 0">'+(d.img?'<img src="'+d.img+'" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none">':'')+'<div style="flex:1;min-width:0"><div class="sec-h"><b>'+esc(d.title)+'</b>'+dStat(d)+'</div><p class="small" style="margin:2px 0;white-space:pre-wrap">'+esc(d.body)+'</p><span class="small muted">'+esc(comp(d.code).name)+'・'+md(d.t)+'</span></div>'+(d.status!=='deleted'?'<button class="btn btn-danger btn-sm" data-act="diary-del" data-v="'+d.id+'">削除</button>':'')+'</article>').join('')+'</div>':'<div class="empty">まだ投稿はありません</div>')+'</div>'}
+function aGMemo(){return '<h1>顧客メモ（全員分）</h1><div class="card panel">'+(S.memos.length?'<div class="list">'+S.memos.map(m=>'<article style="padding:10px 0"><div class="sec-h"><b>'+esc(m.name)+'</b><span class="small muted">'+esc(comp(m.code).name)+'・'+md(m.t)+'</span></div>'+(m.like?'<p class="small" style="margin:2px 0">好み：'+esc(m.like)+'</p>':'')+(m.care?'<p class="small" style="margin:2px 0">注意：'+esc(m.care)+'</p>':'')+'</article>').join('')+'</div>':'<div class="empty">まだメモはありません</div>')+'<p class="note">店舗はすべてのメモを確認できます。ほかの女性には表示されません。</p></div>'}
+
+/* ===== 描画 ===== */
+function render(){
+  if(!ready)return;
+  ['c','g','a'].forEach(k=>document.getElementById('mode-'+k).setAttribute('aria-pressed',S.ui.mode===k));
+  const app=document.getElementById('app');
+  const keep={};app.querySelectorAll('input[id],textarea[id]').forEach(el=>{if(el.type!=='file'&&el.type!=='checkbox')keep[el.id]=el.value});
+  const fid=document.activeElement&&document.activeElement.id;
+  app.innerHTML=S.ui.mode==='c'?renderCustomer():S.ui.mode==='g'?renderComp():renderAdmin();
+  app.querySelectorAll('.admin.sp table').forEach(tb=>{const hs=[...tb.querySelectorAll('thead th')].map(h=>h.textContent.trim());tb.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(hs[i])td.setAttribute('data-label',hs[i])}))});
+  for(const k in keep){const el=document.getElementById(k);if(el&&!el.value)el.value=keep[k]}
+  if(fid){const el=document.getElementById(fid);if(el&&el.focus&&el.type!=='file')el.focus()}
+  save();
+}
+
+/* ===== Excel取り込み（担当者コード・担当者の2列だけ） ===== */
+function readRoster(file,store){
+  if(!window.XLSX){document.getElementById('imp-err').textContent='Excelを読む部品を読み込めませんでした。通信を確認して、ページを開き直してください。';return}
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(fr.result),{type:'array'});
+      let found=null;
+      for(const name of wb.SheetNames){
+        const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''});
+        for(let i=0;i<Math.min(aoa.length,20);i++){
+          const h=aoa[i].map(x=>String(x).trim()); const ci=h.indexOf('担当者コード'), ni=h.indexOf('担当者');
+          if(ci>=0&&ni>=0){found={aoa,i,ci,ni,width:h.filter(x=>x!=='').length,title:String((aoa[0]||[])[0]||'')};break}
+        }
+        if(found)break;
+      }
+      if(!found){document.getElementById('imp-err').textContent='「担当者コード」と「担当者」の列が見つかりませんでした。給与一覧のファイルか確認してください。';return}
+      const rows=[];
+      for(let r=found.i+1;r<found.aoa.length;r++){
+        const code=String(found.aoa[r][found.ci]||'').trim(), name=String(found.aoa[r][found.ni]||'').trim();
+        if(!code||!name||/合計|計$/.test(code+name))continue;
+        rows.push({code,name}); // ほかの列はここで捨てる
+      }
+      const guess=STORES.find(s=>found.title.replace(/\s/g,'').includes(s.replace(/\s/g,'')))||store;
+      S.ui.imp={store:guess,rows,skipped:Math.max(0,found.width-2)};
+      render();
+    }catch(e){document.getElementById('imp-err').textContent='ファイルを読み込めませんでした（'+(e&&e.message||'形式エラー')+'）。'}
+  };
+  fr.onerror=()=>{document.getElementById('imp-err').textContent='ファイルを読み込めませんでした。'};
+  fr.readAsArrayBuffer(file);
+}
+
+/* ===== 操作 ===== */
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]'); if(!el)return;
+  const a=el.dataset.act, v=el.dataset.v, u=me(), g=gme();
+  if(a==='close-sheet'){if(e.target===el)closeSheet();return}
+  if(a==='yt'){track('youtube');save();return}
+  switch(a){
+    case 'mode': S.ui.mode=v; closeSheet(); break;
+    case 'reset': sheet('<h3>デモを最初に戻しますか？</h3><p style="margin:0">追加したデータがすべて初期の例に戻ります。</p><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost" data-act="sheet-cancel">やめる</button><button class="btn btn-danger" data-act="reset-ok">最初に戻す</button></div>'); return;
+    case 'reset-ok': {const ui=S.ui;S=seed();S.ui=Object.assign(seed().ui,{mode:ui.mode});db.collection('photos').get().then(q=>q.forEach(d=>d.ref.delete()));if(auth.currentUser&&!auth.currentUser.isAnonymous)auth.signOut();closeSheet();toast('全員のデータを最初に戻しました');break}
+    case 'sheet-cancel': closeSheet(); return;
+    /* お客様 */
+    case 'tab': S.ui.tab=CFEAT[v]===false?'home':v; S.ui.chatWith=null; S.ui.hv=null; S.stats.tabs[v]=(S.stats.tabs[v]||0)+1; scrollTo(0,0); break;
+    case 'login-back': S.ui.loginStep='phone'; break;
+    case 'logout': S.cur=null; S.ui.loginStep='phone'; if(auth.currentUser&&!auth.currentUser.isAnonymous)auth.signOut(); break;
+    case 'open-news': {const n=S.news.find(x=>x.id===v);view(u);track('news',n.title);sheet('<div class="sec-h"><h3>'+esc(n.title)+'</h3>'+closeBtn+'</div><p class="small muted" style="margin:0">'+md(n.t)+'・'+esc(n.store)+'</p><p style="margin:0">'+esc(n.body)+'</p>');render();return}
+    case 'open-media': {const m=S.media.find(x=>x.id===v);view(u);track('media',m.name);sheet('<div class="sec-h"><h3>'+esc(m.type)+'：'+esc(m.name)+'</h3>'+closeBtn+'</div><div class="ph" style="height:200px">['+esc(m.type)+']</div>');render();return}
+    case 'open-newbie': {const n=S.newbies.find(x=>x.id===v);view(u);track('newbie',n.name);sheet('<div class="sec-h"><h3>'+esc(n.name)+'</h3>'+closeBtn+'</div>'+(phSrc(nbPhoto(n))?'<img src="'+phSrc(nbPhoto(n))+'" alt="'+esc(n.name)+'の写真" style="width:100%;max-width:300px;aspect-ratio:3/4;object-fit:cover;border-radius:12px;align-self:center">':'<div class="ph" style="width:100%;max-width:300px;aspect-ratio:3/4;align-self:center">写真</div>')+'<p class="small muted" style="margin:0">'+esc(n.store)+'・'+md(n.t)+'入店</p>');render();return}
+    case 'open-banner': {const b=S.banners.find(x=>x.id===v);track('banner',b.title);sheet('<div class="sec-h"><h3>'+esc(b.title)+'</h3>'+closeBtn+'</div>'+(b.photo?'<img src="'+bnSrc(b.photo)+'" alt="" style="width:100%;border-radius:12px;aspect-ratio:840/372;object-fit:cover">':'')+(b.body?'<p style="margin:0;white-space:pre-wrap">'+esc(b.body)+'</p>':'')+(b.url?'<a class="btn btn-primary" href="'+esc(b.url)+'" target="_blank" rel="noopener">詳しく見る ›</a>':''));render();return}
+    case 'search': searchSheet(); return;
+    case 'hv': S.ui.hv=v; scrollTo(0,0); break;
+    case 'mf': S.ui.mf=v; break;
+    case 'nbg': S.ui.nbg=v; break;
+    case 'help': S.ui.help=S.ui.help||{}; S.ui.help[v]=!S.ui.help[v]; break;
+    case 'cp-clear': {S.ui.cimg=null;const pv=document.getElementById('cp-prev');if(pv)pv.innerHTML=rectPh(null,78);return}
+    case 'st-grp': S.ui.stGrp=v; break;
+    case 'store-girls': S.ui.sStore=v; S.ui.q=''; S.ui.hv='girls'; scrollTo(0,0); break;
+    case 'girls-back': S.ui.hv=null; break;
+    case 'girls-reset': S.ui.sort=''; S.ui.flt={}; S.ui.q=''; break;
+    case 'home-cond': S.ui.sStore=''; S.ui.hv='girls'; render(); scrollTo(0,0); searchSheet(); return;
+    case 'sort': S.ui.sort=S.ui.sort===v?'':v; render(); searchSheet(); return;
+    case 'flt': S.ui.flt=S.ui.flt||{}; S.ui.flt[v]=!S.ui.flt[v]; render(); searchSheet(); return;
+    case 'search-reset': S.ui.sort=''; S.ui.flt={}; S.ui.sStore=''; S.ui.q=''; render(); if(document.querySelector('.sheet'))searchSheet(); return;
+    case 'c-edit': {const c=S.comps.find(x=>x.code===v);S.ui.cimg=undefined;
+      sheet('<form data-form="comp-prof" data-code="'+esc(c.code)+'" style="display:flex;flex-direction:column;gap:10px"><div class="sec-h"><h3>'+esc(c.name)+' のプロフィール</h3>'+closeBtn+'</div>'+
+        '<div style="display:flex;gap:14px;align-items:center"><span id="cp-prev">'+rectPh(c.photo,78,c.name+'の写真')+'</span><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><label class="btn btn-ghost btn-sm" for="cphoto">写真を選ぶ</label><span class="small muted">横390×縦520pxに自動で切り抜き</span><input id="cphoto" type="file" accept="image/*" class="sr"><button type="button" class="linkbtn" data-act="cp-clear">写真を外す</button></div></div><p class="small muted" style="margin:0">本番は店舗サイトから自動で取り込みます。取り込めない・別の写真にしたいときだけ、ここで登録します。</p><div class="g2"><div class="field"><label for="pk">よみがな（あいうえお順用）</label><input class="input" id="pk" name="kana" value="'+esc(c.kana||'')+'"></div><div class="field"><label for="pa">年齢</label><input class="input num" id="pa" name="age" type="number" min="18" max="99" value="'+(c.age||'')+'"></div><div class="field"><label for="ph2">身長（cm）</label><input class="input num" id="ph2" name="height" type="number" min="130" max="200" value="'+(c.height||'')+'"></div><div class="field"><label for="pcup">カップ</label><select class="input" id="pcup" name="cup"><option value="">未設定</option>'+CUPS.split('').map(x=>'<option'+(c.cup===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div></div>'+
+        FLTS.map(([k,l])=>'<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="'+k+'"'+(c[k]?' checked':'')+' style="width:20px;height:20px">'+l+'</label>').join('')+
+        (JK[c.store]?'<div class="field"><label for="psite">熟女家サイトのプロフィールURL（またはID）</label><input class="input" id="psite" name="site" value="'+esc(c.siteId||'')+'" placeholder="https://umeda.jukujoya.jp/ms_lady/detail/0000/"></div><p class="small muted" style="margin:0">本番では源氏名で自動ひも付けし、一致しない人だけここで設定します。</p>':'')+
+        '<button class="btn btn-primary" type="submit">保存する</button></form>'); return;}
+    case 'fav': {if(u.limited){toast('現在、ご利用が制限されています');return}if(!talkAvail(comp(v))){toast('現在この女性はトークを受け付けていません');return}if(room(u.phone,v))return;S.rooms.push({id:u.phone+'|'+v,phone:u.phone,code:v,status:'requested',by:'fav',t:Date.now(),flags:[],msgs:[]});toast('申請を送りました。女性が承認するとトークできます');if(document.querySelector('.sheet'))girlSheet(v);break}
+    case 'open-chat': jvClose(); closeSheet(); S.ui.chatWith=v; S.ui.tab='talk'; S.ui.hv=null; scrollTo(0,0); break;
+    case 'chat-back': S.ui.chatWith=null; break;
+    case 'rv-filter': S.ui.rvFilter=v; break;
+    case 'bd-filter': S.ui.bdFilter=v; break;
+    case 'unlock': if(u.coins<R.READ){toast('Jコインが足りません（あと'+(R.READ-u.coins)+'J）');return} addCoins(u,-R.READ,'口コミ閲覧');u.unlocked.push(v);toast('口コミを開きました −'+R.READ+'J');break;
+    case 'write-review': if(u.limited){toast('現在、ご利用が制限されています');return} sheet('<form data-form="review" style="display:flex;flex-direction:column;gap:12px"><div class="sec-h"><h3>口コミを書く</h3>'+closeBtn+'</div><div class="field"><label for="rg">女性</label><select class="input" id="rg" name="girl">'+activeComps().map(c=>'<option value="'+esc(c.code)+'">'+esc(c.name)+'（'+esc(c.store)+'）</option>').join('')+'</select></div><div style="display:flex;flex-direction:column;gap:2px"><b style="font-size:14px">評価（5段階）</b>'+RV_ITEMS.map((l,i)=>'<div class="srow" role="radiogroup" aria-label="'+l+'"><span>'+l+'</span><span class="starpick">'+[5,4,3,2,1].map(n=>'<input type="radio" id="s'+i+'-'+n+'" name="s'+i+'" value="'+n+'"><label for="s'+i+'-'+n+'" title="'+n+'点">★</label>').join('')+'</span></div>').join('')+'</div><div class="field"><label for="rt">感想</label><textarea class="input" id="rt" name="text" maxlength="400"></textarea></div><p class="err" id="rt-err"></p><button class="btn btn-primary" type="submit">送信する（承認後 ＋'+R.REVIEW+'J）</button></form>'); return;
+    case 'rules': sheet('<div class="sec-h"><h3>ご利用ルール</h3>'+closeBtn+'</div><ul style="margin:0;padding-left:1.2em"><li>誹謗中傷は禁止です。</li><li>連絡先・店外のお誘いは書き込めません。</li><li>個人が特定できる情報は書かないでください。</li><li>違反した投稿は削除し、悪質な場合は書き込みを停止します。</li></ul>'); return;
+    case 'report-post': {const p=S.posts.find(x=>x.id===v);p.reports++;p.dismissed=false;if(p.reports>=3)p.hidden=true;toast('通報しました');break}
+case 'hv-prefs': S.ui.tab='home'; S.ui.hv='prefs'; scrollTo(0,0); break;
+    case 'jv-open': jvOpen(v); return;
+    case 'jv-close': jvClose(); render(); return;
+    case 'girl-sheet': girlSheet(v); return;
+    case 'a-mutual': {const r=S.rooms.find(x=>x.id===v);r.status='open';r.by='staff';r.t=Date.now();toast('相互お気に入りにしました。トークを始められます');break}
+    case 'u-limit': {const lu=S.users[v];lu.limited=!lu.limited;toast(lu.limited?'利用を制限しました':'制限を解除しました');break}
+    case 'g-block': {if(el.dataset.c!=='1'){el.dataset.c='1';el.textContent='もう一度押すとブロックします';return}const r=S.rooms.find(x=>x.id===v);r.status='blocked';r.blockedAt=Date.now();S.ui.gThread=null;toast('ブロックしました');break}
+    case 'g-unblock': {const r=S.rooms.find(x=>x.id===v);r.status='open';toast('ブロックを解除しました');break}
+    case 'jk-st': {const x=S.juku.videos.find(y=>y.id===v);x.status=el.dataset.s;toast(x.status==='on'?'公開しました':'停止しました');break}
+    case 'jk-del': if(el.dataset.c!=='1'){el.dataset.c='1';el.textContent='もう一度押すと削除';return} S.juku.videos=S.juku.videos.filter(x=>x.id!==v);delete VID[v];toast('削除しました');break;
+    case 'col-open': {const c=S.columns.find(x=>x.id===v);sheet('<div class="sec-h"><h3>'+esc(c.title)+'</h3>'+closeBtn+'</div><p class="small muted" style="margin:0">'+esc(c.cat)+'・'+md(c.t)+'</p><p style="margin:0;white-space:pre-wrap;line-height:1.8">'+esc(c.body)+'</p>');return}
+    case 'tm-start': {const t=tmS();try{tmCtx=tmCtx||new (window.AudioContext||window.webkitAudioContext)();tmCtx.resume&&tmCtx.resume()}catch(err){}t.end=Date.now()+(t.left!=null?t.left:t.dur*60000);t.left=null;t.run=true;break}
+    case 'tm-pause': {const t=tmS();t.left=t.end-Date.now();t.run=false;break}
+    case 'tm-reset': {const t=tmS();Object.assign(t,{end:null,left:null,run:false,a1:false,a2:false});break}
+    case 'tm-add': {const t=tmS();if(t.run)t.end+=600000;else t.left=(t.left!=null?t.left:t.dur*60000)+600000;t.dur+=10;t.a1=false;t.a2=false;toast('10分延長しました');break}
+    case 'tm-dur': {const t=tmS();Object.assign(t,{dur:+v,end:null,left:null,run:false,a1:false,a2:false});break}
+    case 'tm-al': {const t=tmS();t.alert=+v;t.a1=tmLeft()<=t.alert*60000;break}
+    case 'bn-clear': S.ui.bnimg=null; break;
+    case 'bn-up': case 'bn-down': {const a2=S.banners,i=a2.findIndex(x=>x.id===v),j=a==='bn-up'?i-1:i+1;if(i<0||j<0||j>=a2.length)return;[a2[i],a2[j]]=[a2[j],a2[i]];break}
+    case 'bn-off': {const b=S.banners.find(x=>x.id===v);b.off=!b.off;toast(b.off?'非表示にしました':'表示しました');break}
+    case 'gc-spin': {const G=S.gacha;if(!G.on||S.ui.gcBusy)return;const free=v==='free';
+      if(free&&gcFreeLeft(u)<1){toast('今日の無料ガチャは終わりました');return}
+      if(!free&&u.coins<G.cost){toast('Jコインが足りません');return}
+      const p=gcDraw();if(!p){toast('景品を準備中です');return}
+      if(free){const t=today();if(!u.gc||u.gc.d!==t)u.gc={d:t,n:0};u.gc.n++}else addCoins(u,-G.cost,'ガチャを回す');
+      if(p.kind==='coin')addCoins(u,p.coin,'ガチャ（'+p.name+'）');else u.items.push({name:p.name,from:'ガチャ',t:Date.now()});
+      G.log.unshift({id:uid(),t:Date.now(),phone:u.phone,pid:p.id,name:p.name,rank:p.rank,free});if(G.log.length>300)G.log.length=300;
+      track('gacha');save();S.ui.gcBusy=true;
+      const stg=document.getElementById('gc-stage');if(stg){const cp=stg.querySelector('.cap');if(cp)cp.style.fill=GCOL[p.rank];stg.classList.remove('spin');void stg.offsetWidth;stg.classList.add('spin')}
+      const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(()=>{S.ui.gcBusy=false;render();sheet('<div class="gc-result"><span class="ball" style="background:'+GCOL[p.rank]+'"></span><span class="rk rk-'+p.rank+'">'+GRK[p.rank]+'</span><span class="big">'+esc(p.name)+'</span><p class="small muted" style="margin:0">'+(p.kind==='coin'?'Jコインに加算しました。':'Jコイン画面の「持ち物」に入りました。ご予約の電話・受付でお伝えください。')+'</p><button type="button" class="btn btn-primary" data-act="sheet-cancel">閉じる</button></div>')},rm?150:1550);
+      return}
+    case 'gc-add': gcFormSync(); S.gacha.prizes.push({id:uid(),rank:'C',name:'新しい景品',kind:'coin',coin:5,rate:0,cap:0}); toast('景品を追加しました。名前と確率を入れて保存してください'); break;
+    case 'gc-del': gcFormSync(); S.gacha.prizes=S.gacha.prizes.filter(p=>p.id!==v); toast('景品を削除しました'); break;
+    case 'go-gacha': S.ui.tab='home'; S.ui.hv='gacha'; scrollTo(0,0); break;
+    case 'buy-reserve': if(u.coins<R.RESERVE){toast('Jコインが足りません');return} addCoins(u,-R.RESERVE,'先の予約枠チケット');u.items.push({name:'1週間以上先の予約チケット'});toast('予約チケットを受け取りました');break;
+    case 'buy-apollo': if(u.coins<R.APOLLO){toast('Jコインが足りません');return} addCoins(u,-R.APOLLO,'アポロのポイント交換申請');S.requests.push({id:uid(),phone:u.phone,type:'アポロのポイント交換',coins:R.APOLLO,status:'wait',t:Date.now()});toast('交換を申請しました');break;
+    /* コンパニオン */
+    case 'jp-ex': {const it=JP_ITEMS.find(x=>x[0]===v);if((g.jp||0)<it[2]){toast('ポイントが足りません');return}g.jp-=it[2];g.jh=g.jh||[];g.jh.unshift({t:Date.now(),v:-it[2],r:'交換：'+it[1]});S.gpReq=S.gpReq||[];S.gpReq.push({id:uid(),code:g.code,name:it[1],pt:it[2],status:'wait',t:Date.now()});toast('交換を申請しました。店舗が確認します');break}
+    case 'gp-done': S.gpReq.find(x=>x.id===v).status='done'; toast('受け渡し済みにしました'); break;
+    case 'gp-back': {const r=S.gpReq.find(x=>x.id===v);r.status='back';const c=S.comps.find(x=>x.code===r.code);if(c){c.jp=(c.jp||0)+r.pt;c.jh=c.jh||[];c.jh.unshift({t:Date.now(),v:r.pt,r:'交換の差し戻し（返却）'})}toast('差し戻してポイントを返却しました');break}
+    case 'gtab': S.ui.gTab=GFEAT[v]===false?'home':v; S.ui.gThread=null; S.ui.memoEdit=null; scrollTo(0,0); break;
+    case 'g-logout': S.gcur=null; break;
+    case 'g-approve': {const r=S.rooms.find(x=>x.id===v);r.status='open';r.t=Date.now();toast('相互お気に入りになりました。トークできます');break}
+    case 'g-decline': S.rooms=S.rooms.filter(x=>x.id!==v); toast('お断りしました'); break;
+    case 'g-thread': S.ui.gThread=v; break;
+    case 'ms-claim': {const st=msState(g),r=st.rows.find(x=>x.m.id===v);if(!r||!r.done||r.got)return;st.got.ids.push(v);g.jp=(g.jp||0)+r.m.pt;g.jh=g.jh||[];g.jh.unshift({t:Date.now(),v:r.m.pt,r:'週間ミッション：'+msLabel(r.m)});toast('＋'+r.m.pt+'pt 受け取りました');break}
+    case 'ms-bonus': {const st=msState(g);if(!st.all||st.got.bonus)return;st.got.bonus=true;g.jp=(g.jp||0)+st.M.bonus;g.jh=g.jh||[];g.jh.unshift({t:Date.now(),v:st.M.bonus,r:'週間ミッション 全部達成ボーナス'});toast('全部達成！ ＋'+st.M.bonus+'pt');break}
+    case 'g-talk-toggle': g.selfOff=!g.selfOff; toast(g.selfOff?'J chatをお休みにしました':'J chatの受付を再開しました'); break;
+    case 'g-thread-close': S.ui.gThread=null; break;
+    case 'g-report': {const r=S.rooms.find(x=>x.id===v);r.flags.push({t:Date.now(),by:g.name+'さんが通報',reason:'女性からの通報'});r.flagSeen=false;toast('店舗に通報しました');break}
+    case 'endtype': S.ui.endType=v; break;
+    case 'shift-del': {const s=shiftDoc(g.code,S.ui.ym);s.entries=s.entries.filter(x=>x.date!==v);break}
+    case 'shift-submit': {const s=shiftDoc(g.code,S.ui.ym);if(!s.entries.length){toast('希望日を1日以上追加してください');return}const first=!s.submitted;s.submitted=Date.now();{const v=first?jpAward(g,'shift'):0;toast('店舗に提出しました'+(v?'（＋'+v+'pt）':''))}break}
+    case 'shift-copy': {const t=document.getElementById('stext').textContent;try{navigator.clipboard.writeText(t).then(()=>toast('コピーしました'),()=>toast('長押しで選んでコピーしてください'))}catch(err){toast('長押しで選んでコピーしてください')}return}
+    case 'memo-new': S.ui.memoEdit='new'; break;
+    case 'memo-open': S.ui.memoEdit=v; break;
+    case 'memo-close': S.ui.memoEdit=null; break;
+    case 'memo-del': if(el.dataset.c!=='1'){el.dataset.c='1';el.textContent='もう一度押すと削除します';return} S.memos=S.memos.filter(m=>m.id!==v);S.ui.memoEdit=null;toast('削除しました');break;
+    /* 管理 */
+    case 'atab': S.ui.aTab=v; S.ui.imp=null; S.ui.aMenu=false; scrollTo(0,0); break;
+    case 'aview': S.ui.aView=v; S.ui.aMenu=false; break;
+    case 'amenu': S.ui.aMenu=!S.ui.aMenu; break;
+    case 'a-room': S.ui.aRoom=v; break;
+    case 'a-fav-ng': S.rooms=S.rooms.filter(x=>x.id!==v); toast('お断りしました'); break;
+    case 'ms-del': S.missions.list=S.missions.list.filter(m=>m.id!==v); toast('ミッションを外しました'); break;
+    case 'a-stop': {const r=S.rooms.find(x=>x.id===v);r.status=r.status==='stopped'?'open':'stopped';toast(r.status==='stopped'?'トークを停止しました':'トークを再開しました');break}
+    case 'c-talk': {const c=S.comps.find(x=>x.code===v);c.talkOn=!c.talkOn;break}
+    case 'c-active': {const c=S.comps.find(x=>x.code===v);c.active=!c.active;if(!c.active&&S.gcur===c.code)S.gcur=null;toast(c.active?'在籍に戻しました':'退店にしました');break}
+    case 'imp-ok': {const imp=S.ui.imp;let n=0,m=0;imp.rows.forEach(r=>{const c=S.comps.find(x=>x.code===r.code);if(c){c.name=r.name;c.store=imp.store;c.active=true;m++}else{S.comps.push({code:r.code,name:r.name,store:imp.store,active:true,talkOn:true});n++}});S.ui.imp=null;toast('取り込みました（新規'+n+'人・更新'+m+'人）');break}
+    case 'imp-cancel': S.ui.imp=null; break;
+    case 'ask-del': el.outerHTML='<button type="button" class="btn btn-danger btn-sm" data-act="do-del" data-k="'+el.dataset.k+'" data-v="'+v+'">本当に削除</button>'; return;
+    case 'do-del': {const map={news:'news',banner:'banners',newbie:'newbies',media:'media',gnotice:'gNotices',column:'columns'},k=map[el.dataset.k];S[k]=S[k].filter(x=>x.id!==v);toast('削除しました');break}
+    case 'rv-ok': {const r=S.reviews.find(x=>x.id===v);r.status='ok';const au=S.users[r.phone];if(au)addCoins(au,R.REVIEW,'口コミ投稿（承認）');toast('承認しました');break}
+    case 'rv-ng': S.reviews.find(x=>x.id===v).status='ng'; break;
+    case 'bd-hide': S.posts.find(x=>x.id===v).hidden=true; break;
+    case 'bd-show': {const p=S.posts.find(x=>x.id===v);p.hidden=false;p.reports=0;p.dismissed=true;break}
+    case 'ban': {const bu=S.users[v];bu.banned=!bu.banned;break}
+    case 'req-done': S.requests.find(x=>x.id===v).status='done'; break;
+    case 'req-back': {const r=S.requests.find(x=>x.id===v);r.status='back';const ru=S.users[r.phone];if(ru)addCoins(ru,r.coins,'交換申請の差し戻し（返却）');break}
+    case 'diary-del': S.diaries.find(x=>x.id===v).status='deleted'; toast('削除しました（ポータルからも削除する想定）'); break;
+    default: return;
+  }
+  render();
+});
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.id==='st'){S.ui.store=el.value;render()}
+  else if(el.id==='ym'){S.ui.ym=el.value;render()}
+  else if(el.id==='cphoto'&&el.files&&el.files[0]){toPhoto(el.files[0],u=>{S.ui.cimg=u;const pv=document.getElementById('cp-prev');if(pv)pv.innerHTML=rectPh(u,78,'選んだ写真')})}
+  else if(el.id==='bnphoto'&&el.files&&el.files[0]){toBanner(el.files[0],u=>{S.ui.bnimg=u;render()})}
+  else if(el.id==='nbphoto'&&el.files&&el.files[0]){toPhoto(el.files[0],u=>{S.ui.nbimg=u;const pv=document.getElementById('nb-prev');if(pv)pv.innerHTML=rectPh(u,78,'選んだ写真')})}
+  else if(el.id==='ms-on'){S.missions.on=el.checked;render()}
+  else if(el.id==='jk-file'){const f=el.files&&el.files[0];if(S.ui.jkFile)URL.revokeObjectURL(S.ui.jkFile.url);S.ui.jkFile=f?{url:URL.createObjectURL(f),kind:/^audio\//.test(f.type)?'voice':'video'}:null}
+  else if(el.id==='ss'){S.ui.sStore=el.value;render();searchSheet()}
+  else if(el.id==='imp-store'&&S.ui.imp){S.ui.imp.store=el.value;render()}
+  else if(el.id==='imp-file'&&el.files&&el.files[0]){readRoster(el.files[0],document.getElementById('imp-store').value);el.value=''}
+  else if(el.id==='dimg'&&el.files&&el.files[0]){const f=el.files[0];if(!/^image\//.test(f.type))return;const img=new Image(),url=URL.createObjectURL(f);
+    img.onload=()=>{const s=Math.min(1,520/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.ui.img=c.toDataURL('image/jpeg',.72);URL.revokeObjectURL(url);render()};img.src=url}
+});
+document.addEventListener('input',e=>{if(e.target.id==='sn'&&gme()){const s=shiftDoc(gme().code,S.ui.ym);s.note=e.target.value.trim();const t=shiftText(gme(),s);const p=document.getElementById('stext');if(p)p.textContent=t;const l=document.getElementById('sline');if(l)l.href='https://line.me/R/share?text='+encodeURIComponent(t);save()}});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.querySelector('.sheet'))closeSheet();else if(document.querySelector('.jv')){jvClose();render()}});
+
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('form[data-form]'); if(!f)return; e.preventDefault();
+  const d=Object.fromEntries(new FormData(f)), k=f.dataset.form, u=me(), g=gme();
+  const err=(id,m)=>{const x=document.getElementById(id);if(x)x.textContent=m};
+  switch(k){
+    case 'login-phone': {const p=(d.phone||'').replace(/\D/g,'');if(!/^0\d{9,10}$/.test(p)){err('lp-err','0から始まる10〜11桁の数字で入力してください。');return}err('lp-err','送信中…');
+      if(!window._rv)window._rv=new firebase.auth.RecaptchaVerifier('recaptcha-box',{size:'invisible'});
+      auth.signInWithPhoneNumber('+81'+p.slice(1),window._rv).then(cr=>{window._cr=cr;S.ui.pendingPhone=p;S.ui.loginStep='code';render()}).catch(e=>err('lp-err','送信できませんでした（'+e.code+'）。テスト用の番号 09000000001〜09000000003 を使ってください。'));
+      return}
+    case 'login-code': {
+      {const p0=S.ui.pendingPhone;if(!S.users[p0]&&!(d.nick||'').trim()){err('lc-err','ニックネームを入力してください。');return}if(!window._cr){err('lc-err','もう一度、電話番号から入力してください。');return}
+      err('lc-err','確認中…');
+      window._cr.confirm(d.code).then(()=>{
+      const p=S.ui.pendingPhone;let nu=S.users[p];
+      if(!nu){const nick=(d.nick||'').trim();
+        nu=S.users[p]={phone:p,nick,coins:0,lastLogin:'',views:{d:'',n:0},unlocked:[],items:[],banned:false,installed:false,history:[]};addCoins(nu,R.FIRST,'初回登録ボーナス');S.stats.reg[today()]=(S.stats.reg[today()]||0)+1}
+      if(isInstalled())nu.installed=true;
+      S.cur=p;S.ui.tab='home';S.ui.loginStep='phone';
+      if(nu.lastLogin!==today()){nu.lastLogin=today();addCoins(nu,R.LOGIN,'ログインボーナス');toast('ログインボーナス ＋'+R.LOGIN+'J')}
+      render()}).catch(()=>err('lc-err','認証コードが違います。'));}
+      return}
+    case 'u-msg': {const t=(d.text||'').trim();if(!t)return;if(!talkAvail(comp(S.ui.chatWith))){toast('現在お休み中のため送信できません');return}const r=room(u.phone,S.ui.chatWith);{const b=chatBlock(u,r);if(b){err('cm-err',b);return}}const why=ng(t);
+      if(why){r.flags.push({t:Date.now(),by:'自動検知（お客様）',reason:why,text:t});r.flagSeen=false;save();err('cm-err',why+'にあたる内容は送れません。店舗にも記録されます。');return}
+      if(u.coins<R.MSG){err('cm-err','Jコインが足りません（あと'+(R.MSG-u.coins)+'J）。');return}
+      r.msgs.push({from:'u',text:t,t:Date.now()});r.t=Date.now();addCoins(u,-R.MSG,'J chat（'+comp(r.code).name+'）');break}
+    case 'review': {const sc=RV_ITEMS.map((x,i)=>+d['s'+i]||0);if(sc.some(x=>!x)){err('rt-err','5つの項目すべてに☆をつけてください。');return}const t=(d.text||'').trim();if(t.length<10){err('rt-err','感想を10文字以上で書いてください。');return}if(ng(t)){err('rt-err','書けない言葉が含まれています。');return}
+      S.reviews.push({id:uid(),girl:d.girl,sc,stars:Math.round(sc.reduce((a,b)=>a+b,0)/5*10)/10,text:t,nick:u.nick,phone:u.phone,t:Date.now(),status:'pending'});closeSheet();toast('送信しました。店舗の確認後に公開されます');break}
+    case 'post': {const t=(d.text||'').trim();if(!t)return;if(ng(t)){err('pt-err','連絡先・店外のお誘い・中傷にあたる言葉は書き込めません。');return}
+      S.posts.push({id:uid(),cat:d.cat,nick:u.nick,text:t,t:Date.now(),official:false,reports:0,hidden:false,phone:u.phone});break}
+    /* コンパニオン */
+    case 'g-login': {const c=S.comps.find(x=>x.code===(d.code||'').trim());if(!c||d.pw!==c.code){err('gid-err','担当者コードかパスワードが違います（デモはどちらも同じ番号）。');return}if(!c.active){err('gid-err','退店の設定になっているため、ログインできません。店舗にご連絡ください。');return}S.gcur=c.code;S.ui.gTab='home';{const v=jpAward(c,'login');if(v)toast('ログインボーナス ＋'+v+'pt')}break}
+    case 'g-msg': {const t=(d.text||'').trim();if(!t)return;const r=S.rooms.find(x=>x.id===f.dataset.id);const why=ng(t);
+      if(why){r.flags.push({t:Date.now(),by:'自動検知（'+g.name+'さん）',reason:why,text:t});r.flagSeen=false;save();err('gm-err',why+'にあたる内容は送れません。店舗にも記録されます。');return}
+      {const last=r.msgs[r.msgs.length-1];r.msgs.push({from:'g',text:t,t:Date.now()});r.t=Date.now();r.uRead=false;
+       if(last&&last.from==='u'&&Date.now()-last.t<day){const v=jpAward(g,'reply');if(v)toast('24時間以内の返信 ＋'+v+'pt')}}break}
+    case 'shift-add': {if(!d.date||!d.date.startsWith(S.ui.ym)){err('sd-err',mL(S.ui.ym)+'の日付を選んでください。');return}const off=!!d.off;if(!off&&d.start>=d.end){err('sd-err','終了は開始より後にしてください。');return}
+      const s=shiftDoc(g.code,S.ui.ym);s.entries=s.entries.filter(x=>x.date!==d.date).concat([{date:d.date,off,start:off?'':d.start,end:off?'':d.end,endType:off?'':S.ui.endType}]);break}
+    case 'diary': {const title=(d.title||'').trim(),body=(d.body||'').trim(),ps=PORTALS.filter((p,i)=>d['p'+i]);if(!title||!body){err('dt-err','タイトルと本文を入力してください。');return}const why=ng(title+' '+body);if(why){err('dt-err',why+'が含まれているため投稿できません。');return}
+      const id=uid();S.diaries.push({id,code:g.code,title,body,img:S.ui.img||'',portals:ps,status:'sending',t:Date.now()});S.ui.img=null;{const v=jpAward(g,'diary');toast('投稿しました。ポータルへ送信しています'+(v?'（＋'+v+'pt）':''))}
+      setTimeout(()=>{const x=S.diaries.find(y=>y.id===id);if(x&&x.status==='sending'){x.status='posted';render()}},1800);break}
+    case 'memo': {const name=(d.name||'').trim();if(!name){err('mn-err','お客様名を入力してください。');return}const id=f.dataset.id;
+      if(id){Object.assign(S.memos.find(m=>m.id===id),{name,like:d.like,care:d.care,t:Date.now()})}else{S.memos.push({id:uid(),code:g.code,name,like:d.like,care:d.care,t:Date.now()});const v=jpAward(g,'memo');if(v){S.ui.memoEdit=null;toast('保存しました（＋'+v+'pt）');break}}S.ui.memoEdit=null;toast('保存しました');break}
+    /* 管理 */
+    case 'home-search': S.ui.q=(d.q||'').trim(); S.ui.sStore=''; S.ui.hv='girls'; scrollTo(0,0); break;
+    case 'ms-add': {const n=Math.max(1,parseInt(d.n,10)||1),pt=Math.max(1,parseInt(d.pt,10)||1);if(!MS_KIND[d.k])return;S.missions.list.push({id:uid(),k:d.k,n,pt});toast('ミッションを追加しました');break}
+    case 'ms-bonus-set': S.missions.bonus=Math.max(0,parseInt(d.b,10)||0); toast('ボーナスを保存しました'); break;
+    case 'open-room': {const p=(d.phone||'').replace(/\D/g,'');if(!S.users[p]){err('or-err','この電話番号の会員が見つかりません。');return}const r=room(p,d.code);
+      if(r){r.status='open';r.by='staff';r.t=Date.now()}else S.rooms.push({id:p+'|'+d.code,phone:p,code:d.code,status:'open',by:'staff',t:Date.now(),flags:[],msgs:[]});toast('相互お気に入りにしました');break}
+    case 'gp-grant': {const c=S.comps.find(x=>x.code===d.code),v=parseInt(d.v,10);if(!c||!(v>0))return;c.jp=(c.jp||0)+v;c.jh=c.jh||[];c.jh.unshift({t:Date.now(),v,r:'店舗からの特別付与'+(d.r?'（'+d.r.trim()+'）':'')});toast(c.name+' さんに ＋'+v+'pt');break}
+    case 'comp-prof': {const c=S.comps.find(x=>x.code===f.dataset.code);
+      c.kana=(d.kana||'').trim(); c.age=d.age?+d.age:null; c.height=d.height?+d.height:null; c.cup=d.cup||'';
+      FLTS.forEach(([k])=>c[k]=!!d[k]);
+      if('site' in d){const m=String(d.site).match(/detail\/(\d+)/)||String(d.site).trim().match(/^(\d+)$/);c.siteId=m?m[1]:''}
+      if(S.ui.cimg!==undefined){c.photo=S.ui.cimg;S.ui.cimg=undefined}
+      closeSheet(); toast('プロフィールを保存しました'); break}
+    case 'onboard': {const fd=new FormData(f),first=f.dataset.edit!=='1';const a={self:fd.get('self')||'',stores:fd.getAll('stores'),body:fd.getAll('body'),age:fd.getAll('age'),cup:fd.getAll('cup'),fet:fd.getAll('fet')};
+      if(!a.self){err('ob-err','あなたの年齢を選んでください。');return}if(!a.stores.length){err('ob-err','よく使う店舗を1つ以上選んでください。');return}
+      u.attr=a;if(first){const n=autoMatch(u);S.ui.tab=n?'talk':'home';toast(n?'好みに合う'+n+'人とJ chatがつながりました':'登録しました')}else{S.ui.hv=null;toast('好みを保存しました')}scrollTo(0,0);break}
+    case 'match-set': S.match.auto=d.auto==='1'; S.match.n=Math.max(1,Math.min(100,parseInt(d.n,10)||30)); toast('自動マッチングの設定を保存しました'); break;
+    case 'jk-set': Object.assign(S.juku,{j:Math.max(0,parseInt(d.j,10)||0),cap:Math.max(0,parseInt(d.cap,10)||0),sec:Math.max(1,Math.min(30,parseInt(d.sec,10)||3)),approve:d.approve==='1'}); toast('熟フェチ図鑑の設定を保存しました'); break;
+    case 'jk-post': {const id=uid(),fl=S.ui.jkFile;S.juku.videos.push({id,g:d.g,code:d.code,kind:fl?fl.kind:(d.g==='voice'?'voice':'video'),t:Date.now(),status:S.juku.approve?'wait':'on'});if(fl)VID[id]=fl.url;S.ui.jkFile=null;toast(S.juku.approve?'投稿しました（承認後に公開）':'投稿しました。お客様の熟フェチ図鑑に表示されます');break}
+    case 'column': S.columns.push({id:uid(),cat:d.cat,title:d.title.trim(),body:(d.body||'').trim(),t:Date.now()}); toast('コラムを公開しました'); break;
+    case 'tm-custom': {const m=parseInt(d.min,10);if(!(m>=5&&m<=600)){toast('5〜600分で入力してください');return}Object.assign(tmS(),{dur:m,end:null,left:null,run:false,a1:false,a2:false});break}
+    case 'gc-save': gcApply(d); toast('ガチャの設定を保存しました'); break;
+    case 'comp-add': {const code=(d.code||'').trim(),name=(d.name||'').trim();if(!code||!name){err('ca-err','担当者コードと源氏名を入力してください。');return}if(S.comps.find(c=>c.code===code)){err('ca-err','この担当者コードはすでに登録されています。');return}
+      S.comps.push({code,name,store:d.store,active:true,talkOn:true});toast('追加しました');break}
+    case 'news': S.news.push({id:uid(),store:S.ui.store,t:Date.now(),title:d.title.trim(),body:(d.body||'').trim()});toast('投稿しました');break;
+    case 'banner': {const url=(d.url||'').trim();if(url&&!/^https?:\/\//.test(url)){toast('リンク先は https:// から入力してください');return}S.banners.unshift({id:uid(),label:(d.label||'').trim()||'お知らせ',title:d.title.trim(),color:d.color,photo:S.ui.bnimg||null,url,body:(d.body||'').trim()});S.ui.bnimg=null;toast('バナーを追加しました');break}
+    case 'newbie': {const t=new Date(d.date).getTime();const code=(d.code||'').trim();S.newbies.push({id:uid(),name:d.name.trim(),store:S.ui.store,t,photo:S.ui.nbimg||null,code});S.ui.nbimg=null;
+      if(code&&!S.comps.find(c=>c.code===code)){S.comps.push({code,name:d.name.trim(),store:S.ui.store,active:true,talkOn:true,photo:S.newbies[S.newbies.length-1].photo});toast('新人情報を投稿し、名簿にも登録しました')}else toast('新人情報を投稿しました');break}
+    case 'media': S.media.push({id:uid(),type:d.type,name:d.name.trim(),store:S.ui.store,t:Date.now()});toast('登録しました');break;
+    case 'grant': {const p=(d.phone||'').replace(/\D/g,''),gu=S.users[p],n=parseInt(d.amount,10);if(!gu){err('gp-err','この電話番号の会員は見つかりません。');return}if(!(n>0)){err('gp-err','1以上で入力してください。');return}addCoins(gu,n,d.reason+'（'+S.ui.store+'）');toast(gu.nick+' さんに ＋'+n+'J');break}
+    case 'official': S.posts.push({id:uid(),cat:'公式',nick:S.ui.store+'スタッフ',text:d.text.trim(),t:Date.now(),official:true,reports:0,hidden:false,phone:null});toast('公式投稿しました');break;
+    case 'gnotice': S.gNotices.push({id:uid(),title:d.title.trim(),body:(d.body||'').trim(),store:d.store,t:Date.now()});toast('配信しました');break;
+    default: return;
+  }
+  if(f.isConnected)f.reset();
+  render();
+});
+boot();
+</script>
